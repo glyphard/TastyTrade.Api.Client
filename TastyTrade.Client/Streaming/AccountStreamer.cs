@@ -20,7 +20,7 @@ namespace TastyTrade.Client.Streaming
     public static class AccountStreamer
     {
         private static long _heartbeatIntervalMillis = 6000L;
-        private static AccountDataUpdates _accountUpdates;
+        
         private static long _requestId = 2L;
         private static readonly string _StreamingAccountOrderUpdate_Type = nameof(StreamingAccountOrderUpdate.Type);
         private static readonly string _SubscriptionActionMessageResponse_Action = nameof(SubscriptionActionMessageResponse<string>.Action);
@@ -78,8 +78,12 @@ namespace TastyTrade.Client.Streaming
 
         public static async Task Run(AuthorizationCredentials credentials)
         {
+            var accountUpdate = await BeginStreamingAccounts(credentials);
+        }
 
-            _accountUpdates = new AccountDataUpdates();
+        public static async Task<AccountDataUpdates> BeginStreamingAccounts(AuthorizationCredentials credentials)
+        {
+            AccountDataUpdates _accountUpdates = new AccountDataUpdates();
             SetupSerializationAttributeStringMaps();
 
             var tastyTradeClient = new TastyTradeClient();
@@ -126,33 +130,34 @@ namespace TastyTrade.Client.Streaming
                 }
                 else
                 {
-                    HandleMessage(buffer, result.Count);
+                    HandleMessage(_accountUpdates, buffer, result.Count);
                 }
             }
             await heartbeatTimer.DisposeAsync();
             Console.WriteLine($"{nameof(AccountStreamer)} runloop exited: {DateTime.UtcNow:yyyyMMddHHmmss}");
+            return _accountUpdates;
         }
 
-        private static void HandleMessage(byte[] buffer, int count)
+        private static void HandleMessage(AccountDataUpdates accountUpdates,  byte[] buffer, int count)
         {
             var msgBody = Encoding.UTF8.GetString(buffer, 0, count);
             Console.WriteLine(msgBody);
             if (msgBody.Contains($"\"{_accountUpdateKeySerializationPropertyNameMap[_SubscriptionActionMessageResponse_Action]}\":\"{_actionTypeStringMap[SubscriptionActionType.Connect]}\""))
             {
-                _accountUpdates.ConnectionStatus = AccountDataUpdatesConnectionStatus.Open;
-                _accountUpdates.ConnectionOpened = DateTime.UtcNow;
+                accountUpdates.ConnectionStatus = AccountDataUpdatesConnectionStatus.Open;
+                accountUpdates.ConnectionOpened = DateTime.UtcNow;
                 Console.WriteLine($"connect confirmation received: {DateTime.UtcNow:yyyyMMddHHmmss}");
             }
             else if (msgBody.Contains($"\"{_accountUpdateKeySerializationPropertyNameMap[_SubscriptionActionMessageResponse_Action]}\":\"{_actionTypeStringMap[SubscriptionActionType.Heartbeat]}\""))
             {
-                _accountUpdates.LastHeartbeatReceived = DateTime.UtcNow;
+                accountUpdates.LastHeartbeatReceived = DateTime.UtcNow;
                 Console.WriteLine($"heartbeat received: {DateTime.UtcNow.ToString("yyyyMMddHHmmss")}");
             }
             else if (msgBody.Contains($"\"{_accountUpdateKeySerializationPropertyNameMap[_StreamingAccountOrderUpdate_Type]}\":\"{_accountUpdateTypeStringMap[StreamingAccountUpdateType.Order]}\""))
             {
                 var orderUpdate = JsonSerializer.Deserialize<StreamingAccountOrderUpdate>(msgBody);
-                _accountUpdates.OrderUpdates.Enqueue(orderUpdate);
-                _accountUpdates.LastOrderUpdateReceived = DateTime.UtcNow;
+                accountUpdates.OrderUpdates.Enqueue(orderUpdate);
+                accountUpdates.LastOrderUpdateReceived = DateTime.UtcNow;
                 Console.WriteLine($"StreamingAccountOrderUpdate received: {DateTime.UtcNow.ToString("yyyyMMddHHmmss")}");
             }
             else

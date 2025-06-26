@@ -9,17 +9,22 @@ namespace TastyTrade.Client.Streaming;
 
 public static class OptionChainStreamer
 {
-    private static OptionChain _optionChain;
+    
     public static async Task Run(AuthorizationCredentials credentials, string symbol, DateTime onOrAfter)
+    {
+        var optChain = await BeingStreamingOptionChain(credentials, symbol, onOrAfter, TimeSpan.Zero);
+    }
+
+    public static async Task<OptionChain> BeingStreamingOptionChain(AuthorizationCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until)
     {
         var tastyTradeClient = new TastyTradeClient();
         await tastyTradeClient.Authenticate(credentials);
 
         var underlying = await tastyTradeClient.GetEquity(symbol);
         var optionChainsResponse = await tastyTradeClient.GetOptionChains(symbol);
-
-        _optionChain = new OptionChain(underlying, optionChainsResponse);
-        _optionChain.SelectNextExpiration(onOrAfter);
+        OptionChain _optionChain = new OptionChain(underlying, optionChainsResponse);
+        
+        _optionChain.SelectNextExpiration(onOrAfter, TimeSpan.Zero);
 
         var apiQuoteTokens = await tastyTradeClient.GetApiQuoteTokens();
         var address = $"dxlink:{apiQuoteTokens.Data.DxlinkUrl}[login=dxlink:{apiQuoteTokens.Data.Token}]";
@@ -34,6 +39,9 @@ public static class OptionChainStreamer
                 {
                     _optionChain.UpdateQuote(quote);
                 }
+                else {
+                    Console.WriteLine($"{ev.GetType().FullName} is not a {nameof(Quote)}");
+                }
             }
         });
         quotes.AddSymbols(_optionChain.Underlying.StreamerSymbol);
@@ -43,5 +51,6 @@ public static class OptionChainStreamer
             quotes.AddSymbols(expiration.Call.StreamerSymbol);
             quotes.AddSymbols(expiration.Put.StreamerSymbol);
         }
+        return _optionChain;
     }
 }

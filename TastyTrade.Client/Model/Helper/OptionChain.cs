@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using DxFeed.Graal.Net.Events.Market;
 using TastyTrade.Client.Model.Response;
 
@@ -11,12 +12,14 @@ public class OptionChain
 {
     public string UpdatedOn { get; internal set; }
     public List<OptionChainExpiration> Expirations { get; internal set; }
+    public List<OptionChainExpiration> AllExpirations { get; set; }
     public OptionChainUnderlying Underlying { get; internal set; }
     public OptionChainUnderlying PreviousUnderlying { get; internal set; }
 
     public OptionChain(EquityResponse underlying, OptionChainResponse response)
     {
         Expirations = [];
+        AllExpirations = [];
         Underlying = new OptionChainUnderlying
         {
             Symbol = underlying.Data.Symbol,
@@ -61,7 +64,7 @@ public class OptionChain
             {
                 expiration.Items.Add(new OptionChainExpirationItem
                 {
-                    Strike = strike.Key,
+                    Strike = Convert.ToDecimal( strike.Key ),
                     Call = new OptionChainItemSide
                     {
                         StreamerSymbol = strike.First(x => x.OptionType == "C").StreamerSymbol
@@ -73,20 +76,24 @@ public class OptionChain
                 });
             }
             Expirations.Add(expiration);
+            AllExpirations.Add(expiration);
         }
     }
 
-    public void SelectNextExpiration(DateTime onOrAfter)
+    public void SelectNextExpiration(DateTime onOrAfter) {
+        SelectNextExpiration(onOrAfter, TimeSpan.Zero);
+    }
+    public void SelectNextExpiration(DateTime onOrAfter, TimeSpan until)
     {
         var nextExpirationDate = GetNextExpirationDate(onOrAfter);
-        Expirations = Expirations.Where(x => x.ExpirationDate == nextExpirationDate).ToList();
+        Expirations = AllExpirations.Where(x => (x.ExpirationDateToDateTime()) >= nextExpirationDate && (x.ExpirationDateToDateTime()) <= nextExpirationDate).ToList();
     }
 
-    private string GetNextExpirationDate(DateTime onOrAfter)
+    private DateTime GetNextExpirationDate(DateTime onOrAfter)
     {
-        return Expirations.Find(x =>
-            (DateTime.ParseExact(x.ExpirationDate, "yyyy-MM-dd", CultureInfo.InvariantCulture) - onOrAfter).Days > 0)
-            .ExpirationDate;
+        return Expirations.OrderBy(e=>e.ExpirationDateToDateTime()).FirstOrDefault(x =>
+            ((x.ExpirationDateToDateTime()) - onOrAfter).Days > 0)
+            .ExpirationDateToDateTime();
     }
 
     public void UpdateQuote(Quote quote)
@@ -121,7 +128,7 @@ public class OptionChain
                         item.Put.Bid = quote.BidPrice;
                         item.Put.Ask = quote.AskPrice;
                     }
-                    item.IsAtTheMoney = item.Strike == Math.Floor(Underlying.Bid) || item.Strike == Math.Floor(Underlying.Ask);
+                    item.IsAtTheMoney = item.Strike == Convert.ToDecimal( Math.Floor(Underlying.Bid)) ||  item.Strike == Convert.ToDecimal( Math.Floor(Underlying.Ask) );
                 }
             }
         }
@@ -140,11 +147,16 @@ public class OptionChainExpiration
 {
     public string ExpirationDate { get; set; }
     public List<OptionChainExpirationItem> Items { get; set; }
+    public DateTime ExpirationDateToDateTime()
+    {
+        var expirationDtm = DateTime.ParseExact(this.ExpirationDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        return expirationDtm;
+    }
 }
 
 public class OptionChainExpirationItem
 {
-    public double Strike { get; set; }
+    public decimal Strike { get; set; }
     public OptionChainItemSide Call { get; set; }
     public OptionChainItemSide Put { get; set; }
     public bool IsAtTheMoney { get; set; }

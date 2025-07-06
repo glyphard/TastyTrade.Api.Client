@@ -13,7 +13,10 @@
     public class Greeks { 
     
         public decimal Delta { get; set; }
+        public decimal Gamma { get; set; }
+
         public decimal Theta {  get; set; }
+        public decimal ThetaPerDay { get; set; }
         public decimal Vega { get; set; }
         public decimal ImpliedVolatility { get; set; }
     

@@ -15,7 +15,7 @@ public static class OptionChainStreamer
         var optChain = await BeingStreamingOptionChain(credentials, symbol, onOrAfter, TimeSpan.Zero);
     }
     
-    public static async Task<OptionChain> BeingStreamingOptionChain(AuthorizationCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until, IOptionGreekProvider greeksProvider)
+    public static async Task<OptionChain> BeingStreamingOptionChain(AuthorizationCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until)
     {
         return await BeingStreamingOptionChain(credentials, symbol, onOrAfter, until, new NoOpGreeksProvider());
     }

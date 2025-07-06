@@ -15,9 +15,11 @@ public class OptionChain
     public List<OptionChainExpiration> AllExpirations { get; set; }
     public OptionChainUnderlying Underlying { get; internal set; }
     public OptionChainUnderlying PreviousUnderlying { get; internal set; }
+    private IOptionGreekProvider _greekProvider;
 
-    public OptionChain(EquityResponse underlying, OptionChainResponse response)
+    public OptionChain(EquityResponse underlying, OptionChainResponse response, IOptionGreekProvider greeksProvider)
     {
+        _greekProvider = greeksProvider;
         Expirations = [];
         AllExpirations = [];
         Underlying = new OptionChainUnderlying
@@ -112,21 +114,39 @@ public class OptionChain
         {
             foreach (var expiration in Expirations)
             {
+                var ttm = expiration.ExpirationDateToDateTime() - DateTime.UtcNow; //TODO: not quite right, but very close
                 foreach (var item in expiration.Items)
                 {
+                    var midUnderlyingPrice = Convert.ToDecimal( Underlying.Bid + ((Underlying.Ask - Underlying.Bid) / 2.0d) );
+                    var midOptionPrice = Convert.ToDecimal( quote.BidPrice + ((quote.AskPrice - quote.BidPrice) / 2.0d) );
+
                     if (item.Call.StreamerSymbol == quote.EventSymbol)
                     {
-                        if (quote.BidPrice != item.Call.Bid && Underlying.Bid != PreviousUnderlying.Bid)
-                            item.Call.Delta = (quote.BidPrice - item.Call.Bid) / (Underlying.Bid - PreviousUnderlying.Bid);
-                        item.Call.Bid = quote.BidPrice;
-                        item.Call.Ask = quote.AskPrice;
+                        if (Convert.ToDecimal(quote.BidPrice) != item.Call.Bid && Underlying.Bid != PreviousUnderlying.Bid)
+                            item.Call.Delta = (Convert.ToDecimal(quote.BidPrice) - item.Call.Bid) / (Convert.ToDecimal(Underlying.Bid) - Convert.ToDecimal(PreviousUnderlying.Bid));
+                        item.Call.Bid = Convert.ToDecimal(quote.BidPrice);
+                        item.Call.Ask = Convert.ToDecimal(quote.AskPrice);
+
+                        var callGreeks = _greekProvider.GetGreeks(OptionType.Call, midUnderlyingPrice, midOptionPrice, item.Strike, ttm.Days, 0.0m, 0.0m);
+                        item.Call.Delta = callGreeks.Delta;
+                        item.Call.Theta = callGreeks.Theta;
+                        item.Call.Vega = callGreeks.Vega;
+                        item.Call.ImpliedVolatility = callGreeks.ImpliedVolatility;
+
                     }
                     else if (item.Put.StreamerSymbol == quote.EventSymbol)
                     {
-                        if (quote.BidPrice != item.Put.Bid && Underlying.Bid != PreviousUnderlying.Bid)
-                            item.Put.Delta = (quote.BidPrice - item.Put.Bid) / (Underlying.Bid - PreviousUnderlying.Bid);
-                        item.Put.Bid = quote.BidPrice;
-                        item.Put.Ask = quote.AskPrice;
+                        if (Convert.ToDecimal(quote.BidPrice) != item.Put.Bid && Underlying.Bid != PreviousUnderlying.Bid)
+                            item.Put.Delta = Convert.ToDecimal( (Convert.ToDecimal(quote.BidPrice) - item.Put.Bid) / (Convert.ToDecimal(Underlying.Bid) - Convert.ToDecimal(PreviousUnderlying.Bid)) );
+                        item.Put.Bid = Convert.ToDecimal( quote.BidPrice );
+                        item.Put.Ask = Convert.ToDecimal( quote.AskPrice );
+
+                        var putGreeks = _greekProvider.GetGreeks(OptionType.Put, midUnderlyingPrice, midOptionPrice, item.Strike, ttm.Days, 0.0m, 0.0m);
+                        item.Put.Delta = putGreeks.Delta;
+                        item.Put.Theta = putGreeks.Theta;
+                        item.Put.Vega = putGreeks.Vega;
+                        item.Put.ImpliedVolatility = putGreeks.ImpliedVolatility;
+
                     }
                     item.IsAtTheMoney = item.Strike == Convert.ToDecimal( Math.Floor(Underlying.Bid)) ||  item.Strike == Convert.ToDecimal( Math.Floor(Underlying.Ask) );
                 }
@@ -165,7 +185,10 @@ public class OptionChainExpirationItem
 public class OptionChainItemSide
 {
     public string StreamerSymbol { get; set; }
-    public double Bid { get; internal set; }
-    public double Ask { get; internal set; }
-    public double Delta { get; internal set; }
+    public decimal Bid { get; internal set; }
+    public decimal Ask { get; internal set; }
+    public decimal Delta { get; internal set; }
+    public decimal Theta { get; internal set; }
+    public decimal Vega { get; internal set; }
+    public decimal ImpliedVolatility { get; internal set; }
 }

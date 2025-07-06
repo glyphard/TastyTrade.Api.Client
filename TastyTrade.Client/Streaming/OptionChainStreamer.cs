@@ -14,15 +14,19 @@ public static class OptionChainStreamer
     {
         var optChain = await BeingStreamingOptionChain(credentials, symbol, onOrAfter, TimeSpan.Zero);
     }
-
-    public static async Task<OptionChain> BeingStreamingOptionChain(AuthorizationCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until)
+    
+    public static async Task<OptionChain> BeingStreamingOptionChain(AuthorizationCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until, IOptionGreekProvider greeksProvider)
+    {
+        return await BeingStreamingOptionChain(credentials, symbol, onOrAfter, until, new NoOpGreeksProvider());
+    }
+    public static async Task<OptionChain> BeingStreamingOptionChain(AuthorizationCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until, IOptionGreekProvider greeksProvider)
     {
         var tastyTradeClient = new TastyTradeClient();
         await tastyTradeClient.Authenticate(credentials);
 
         var underlying = await tastyTradeClient.GetEquity(symbol);
         var optionChainsResponse = await tastyTradeClient.GetOptionChains(symbol);
-        OptionChain _optionChain = new OptionChain(underlying, optionChainsResponse);
+        OptionChain _optionChain = new OptionChain(underlying, optionChainsResponse, greeksProvider);
         
         _optionChain.SelectNextExpiration(onOrAfter, TimeSpan.Zero);
 
@@ -52,5 +56,13 @@ public static class OptionChainStreamer
             quotes.AddSymbols(expiration.Put.StreamerSymbol);
         }
         return _optionChain;
+    }
+}
+
+public class NoOpGreeksProvider : IOptionGreekProvider
+{
+    public Greeks GetGreeks(OptionType optionType, decimal underlyingPrice, decimal optionMarketPrice, decimal strike, decimal timeToExpiryCalendarDays, decimal interestRates, decimal dividends)
+    {
+        return new Greeks() { Delta = decimal.Zero, Theta = decimal.Zero, Vega = decimal.Zero, ImpliedVolatility = decimal.Zero };
     }
 }

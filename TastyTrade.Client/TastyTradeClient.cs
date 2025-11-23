@@ -3,6 +3,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection.Metadata.Ecma335;
 using System.Text.Json;
 using System.Threading.Tasks;
 using TastyTrade.Client.Model;
@@ -112,14 +113,52 @@ public class TastyTradeClient
     }
     public async Task<TransactionsResponse> GetTransactions(string accountNumber)
     {
-        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/transactions");
+        var sinceWhen = DateTime.UtcNow.AddMonths(-12).ToString("yyyy-MM-dd");
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/transactions?per-page=999&start-date={sinceWhen}");
         return JsonSerializer.Deserialize<TransactionsResponse>(response);
     }
+
+
+
     public async Task<EquityResponse> GetEquity(string symbol)
     {
         var response = await Get($"{_baseUrl}/instruments/equities/{symbol}");
         return JsonSerializer.Deserialize<EquityResponse>(response);
     }
+
+    // New: retrieve positions for an account
+    public async Task<PositionsResponse> GetPositions(string accountNumber)
+    {
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/positions");
+        return JsonSerializer.Deserialize<PositionsResponse>(response);
+    }
+    
+    public async Task<WatchListResponse> GetPublicWatchList(string watchlist_name)
+    {
+        var response = await Get($"{_baseUrl}/public-watchlists/{watchlist_name}");
+        return JsonSerializer.Deserialize<WatchListResponse>(response);
+    }
+
+    public async Task<WatchListResponse> GetUserWatchList(string watchlist_name)
+    {
+        var response = await Get($"{_baseUrl}/watchlists/{watchlist_name}");
+        if (string.IsNullOrWhiteSpace(response)) {
+            return default(WatchListResponse);
+        }
+        return JsonSerializer.Deserialize<WatchListResponse>(response);
+    }
+
+    public async Task<MarketMetricsInfoResponse> GetMarketMetrics(string[] symbols)
+    {
+        var response = await Get($"{_baseUrl}/market-metrics?symbols={string.Join(',', symbols)}");
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return default(MarketMetricsInfoResponse);
+        }
+        return JsonSerializer.Deserialize<MarketMetricsInfoResponse>(response);
+    }
+
+
     private async Task<string> Get(string url)
     {
         using var client = new HttpClient();

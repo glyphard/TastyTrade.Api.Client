@@ -26,11 +26,50 @@ public static class OptionChainStreamer
 
         var underlying = await tastyTradeClient.GetEquity(symbol);
         var optionChainsResponse = await tastyTradeClient.GetOptionChains(symbol);
-        OptionChain _optionChain = new OptionChain(underlying, optionChainsResponse, greeksProvider);
-        
-        _optionChain.SelectNextExpiration(onOrAfter, TimeSpan.Zero);
+
+        // Always return an OptionChain instance (never null). If we don't have option chain data,
+        // we'll return an OptionChain with empty Expirations/AllExpirations and populated underlying if available.
+        OptionChain _optionChain;
+        if (underlying?.Data == null)
+        {
+            Console.WriteLine($"No underlying data returned for symbol '{symbol}'. Returning empty OptionChain.");
+            _optionChain = new OptionChain(); // empty collections
+        }
+        else if (optionChainsResponse?.Data == null)
+        {
+            Console.WriteLine($"No option chain data returned for symbol '{symbol}'. Returning OptionChain with underlying and empty expirations.");
+            _optionChain = new OptionChain
+            {
+                Underlying = new OptionChainUnderlying
+                {
+                    Symbol = underlying.Data.Symbol,
+                    StreamerSymbol = underlying.Data.StreamerSymbol
+                },
+                PreviousUnderlying = new OptionChainUnderlying
+                {
+                    Symbol = underlying.Data.Symbol,
+                    StreamerSymbol = underlying.Data.StreamerSymbol
+                }
+            };
+        }
+        else
+        {
+            _optionChain = new OptionChain(underlying, optionChainsResponse, greeksProvider);
+        }
+
+        // Only attempt to select an expiration if we have expirations available
+        if (_optionChain.Expirations != null && _optionChain.Expirations.Count > 0)
+        {
+            _optionChain.SelectNextExpiration(onOrAfter, TimeSpan.Zero);
+        }
 
         var apiQuoteTokens = await tastyTradeClient.GetApiQuoteTokens();
+        if (apiQuoteTokens?.Data == null)
+        {
+            Console.WriteLine("Failed to acquire API quote tokens. Returning OptionChain (streaming not started).");
+            return _optionChain;
+        }
+
         var address = $"dxlink:{apiQuoteTokens.Data.DxlinkUrl}[login=dxlink:{apiQuoteTokens.Data.Token}]";
         var feed = DXEndpoint.GetInstance().Connect(address).GetFeed();
         var quotes = feed.CreateSubscription(typeof(Quote));
@@ -48,13 +87,32 @@ public static class OptionChainStreamer
                 }
             }
         });
-        quotes.AddSymbols(_optionChain.Underlying.StreamerSymbol);
 
-        foreach (var expiration in _optionChain.Expirations[0].Items)
+        if (!string.IsNullOrEmpty(_optionChain.Underlying?.StreamerSymbol))
         {
-            quotes.AddSymbols(expiration.Call.StreamerSymbol);
-            quotes.AddSymbols(expiration.Put.StreamerSymbol);
+            quotes.AddSymbols(_optionChain.Underlying.StreamerSymbol);
         }
+
+        var firstExpiration = (_optionChain.Expirations != null && _optionChain.Expirations.Count > 0) ? _optionChain.Expirations[0] : null;
+        if (firstExpiration?.Items != null)
+        {
+            foreach (var expiration in firstExpiration.Items)
+            {
+                if (expiration?.Call?.StreamerSymbol != null)
+                {
+                    quotes.AddSymbols(expiration.Call.StreamerSymbol);
+                }
+                if (expiration?.Put?.StreamerSymbol != null)
+                {
+                    quotes.AddSymbols(expiration.Put.StreamerSymbol);
+                }
+            }
+        }
+        else
+        {
+            Console.WriteLine($"No option items found for first expiration of '{symbol}'. Subscribed only to underlying (if available).");
+        }
+
         return _optionChain;
     }
 }

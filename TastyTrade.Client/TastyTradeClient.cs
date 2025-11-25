@@ -157,7 +157,36 @@ public class TastyTradeClient
         }
         return JsonSerializer.Deserialize<MarketMetricsInfoResponse>(response);
     }
+    public async Task<MarginRequirementsPublicConfigurationResponse> GetMarginRequirementsPublicConfiguration()
+    {
+        var response = await Get($"{_baseUrl}/margin-requirements-public-configuration");
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return default(MarginRequirementsPublicConfigurationResponse);
+        }
+        return JsonSerializer.Deserialize<MarginRequirementsPublicConfigurationResponse>(response);
+    }
 
+    public async Task<MarketDataResponse> GetMarketData(string[] index, string[] equity, string[] equityOption, string[] future, string[] futureOption, string[] cryptocurrency)
+    {
+        var indexParam = index?.Length > 0 ? string.Join(',', index) : string.Empty;
+        var equityParam = equity?.Length > 0 ? string.Join(',', equity) : string.Empty;
+        var equityOptionParam = equityOption?.Length > 0 ? string.Join(',', equityOption) : string.Empty;
+
+        var futureParam = future?.Length > 0 ? string.Join(',', future) : string.Empty;
+        var futureOptionParam = futureOption?.Length > 0 ? string.Join(',', futureOption) : string.Empty;
+        var cryptocurrencyParam = cryptocurrency?.Length > 0 ? string.Join(',', cryptocurrency) : string.Empty;
+
+        var response = await Get($"{_baseUrl}/market-data/by-type?index={indexParam}&equity={equityParam}&equity-option={equityOptionParam}&future={futureParam}&future-option={futureOptionParam}&cryptocurrency={cryptocurrencyParam}");
+
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return default(MarketDataResponse);
+        }
+        return JsonSerializer.Deserialize<MarketDataResponse>(response);
+    }
+
+    
 
     private async Task<string> Get(string url)
     {

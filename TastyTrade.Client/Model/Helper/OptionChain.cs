@@ -229,10 +229,10 @@ public class OptionChainExpirationItem
 public class OptionChainItemSide
 {
     public string StreamerSymbol { get; set; }
-    public decimal Bid { get; internal set; }
-    public decimal Ask { get; internal set; }
-    public decimal Delta { get; internal set; }
-    public decimal Theta { get; internal set; }
-    public decimal Vega { get; internal set; }
-    public decimal ImpliedVolatility { get; internal set; }
+    public decimal Bid { get; set; }
+    public decimal Ask { get; set; }
+    public decimal Delta { get; set; }
+    public decimal Theta { get; set; }
+    public decimal Vega { get; set; }
+    public decimal ImpliedVolatility { get; set; }
 }

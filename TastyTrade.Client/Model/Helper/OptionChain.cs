@@ -234,5 +234,5 @@ public class OptionChainItemSide
     public decimal Delta { get; set; }
     public decimal Theta { get; set; }
     public decimal Vega { get; set; }
-    public decimal ImpliedVolatility { get; set; }
+    public decimal? ImpliedVolatility { get; set; }
 }

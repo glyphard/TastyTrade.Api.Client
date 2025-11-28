@@ -84,8 +84,8 @@ public class OptionChain
                 var callEntry = strike.FirstOrDefault(x => x.OptionType == "C");
                 var putEntry = strike.FirstOrDefault(x => x.OptionType == "P");
 
-                var callSide = new OptionChainItemSide { StreamerSymbol = callEntry?.StreamerSymbol ?? string.Empty };
-                var putSide = new OptionChainItemSide { StreamerSymbol = putEntry?.StreamerSymbol ?? string.Empty };
+                var callSide = new OptionChainItemSide { StreamerSymbol = callEntry?.StreamerSymbol ?? string.Empty, OptionSymbol = callEntry.Symbol };
+                var putSide = new OptionChainItemSide { StreamerSymbol = putEntry?.StreamerSymbol ?? string.Empty, OptionSymbol = putEntry.Symbol  };
 
                 expiration.Items.Add(new OptionChainExpirationItem
                 {
@@ -229,6 +229,7 @@ public class OptionChainExpirationItem
 public class OptionChainItemSide
 {
     public string StreamerSymbol { get; set; }
+    public string OptionSymbol { get; set; }
     public decimal Bid { get; set; }
     public decimal Ask { get; set; }
     public decimal Delta { get; set; }

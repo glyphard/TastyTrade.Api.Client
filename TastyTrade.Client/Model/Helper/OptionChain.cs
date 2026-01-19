@@ -84,8 +84,22 @@ public class OptionChain
                 var callEntry = strike.FirstOrDefault(x => x.OptionType == "C");
                 var putEntry = strike.FirstOrDefault(x => x.OptionType == "P");
 
-                var callSide = new OptionChainItemSide { StreamerSymbol = callEntry?.StreamerSymbol ?? string.Empty, OptionSymbol = callEntry.Symbol };
-                var putSide = new OptionChainItemSide { StreamerSymbol = putEntry?.StreamerSymbol ?? string.Empty, OptionSymbol = putEntry.Symbol  };
+                // Create sides only if the entry exists to avoid null-reference problems later.
+                var callSide = callEntry == null
+                    ? null
+                    : new OptionChainItemSide
+                    {
+                        StreamerSymbol = callEntry.StreamerSymbol ?? string.Empty,
+                        OptionSymbol = callEntry.Symbol ?? string.Empty
+                    };
+
+                var putSide = putEntry == null
+                    ? null
+                    : new OptionChainItemSide
+                    {
+                        StreamerSymbol = putEntry.StreamerSymbol ?? string.Empty,
+                        OptionSymbol = putEntry.Symbol ?? string.Empty
+                    };
 
                 expiration.Items.Add(new OptionChainExpirationItem
                 {

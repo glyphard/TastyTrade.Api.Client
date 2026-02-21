@@ -8,7 +8,7 @@ namespace TastyTrade.Client.Streaming;
 
 public static class FuturesStreamer
 {
-    public static async Task Run(AuthorizationCredentials credentials, string futureSymbol)
+    public static async Task Run( TastyOAuthCredentials credentials, string futureSymbol)
     {
         var tastyTradeClient = new TastyTradeClient();
         await tastyTradeClient.Authenticate(credentials);

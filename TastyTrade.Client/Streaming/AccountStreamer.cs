@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
@@ -76,13 +75,14 @@ namespace TastyTrade.Client.Streaming
             _accountUpdateKeySerializationPropertyNameMap.Add(_SubscriptionActionMessageResponse_Action, actionMessageActionTypeSerializationValue);
         }
 
-        public static async Task Run(AuthorizationCredentials credentials)
+        public static async Task Run(TastyOAuthCredentials credentials, string accountNumber)
         {
-            var accountUpdate = await BeginStreamingAccounts(credentials);
+            var accountUpdate = await BeginStreamingAccounts(credentials, accountNumber);
         }
 
-        public static async Task<AccountDataUpdates> BeginStreamingAccounts(AuthorizationCredentials credentials)
+        public static async Task<AccountDataUpdates> BeginStreamingAccounts(TastyOAuthCredentials credentials, string accountNumber)
         {
+            // Prepare and authenticate
             AccountDataUpdates _accountUpdates = new AccountDataUpdates();
             SetupSerializationAttributeStringMaps();
 
@@ -91,50 +91,105 @@ namespace TastyTrade.Client.Streaming
 
             var authToken = tastyTradeClient.GetAuthenticationResponse().Data.SessionToken;
 
-            using var source = new CancellationTokenSource();
-            using var ws = new ClientWebSocket();
+            // Create resources but DO NOT dispose them here so the background task can own their lifetime.
+            var source = new CancellationTokenSource();
+            var ws = new ClientWebSocket();
             Stopwatch _heartbeatStopwatch = Stopwatch.StartNew();
+
+            // Heartbeat timer uses ws and source and must remain alive while background task runs.
             Timer heartbeatTimer = new Timer((s) =>
             {
-                if (_accountUpdates.ConnectionStatus == AccountDataUpdatesConnectionStatus.Open
-                && _heartbeatStopwatch.ElapsedMilliseconds >= _heartbeatIntervalMillis)
+                try
                 {
-                    _heartbeatStopwatch.Restart();
-                    var heartbeatMsg = new SubscriptionActionMessageRequest<string>() { Action = SubscriptionActionType.Heartbeat, AuthToken = authToken, RequestId = _requestId++, Value = new string[] { credentials.AccountNumber } };
-                    var heartbeatMsgBody = JsonSerializer.Serialize(heartbeatMsg);
+                    if (_accountUpdates.ConnectionStatus == AccountDataUpdatesConnectionStatus.Open
+                        && _heartbeatStopwatch.ElapsedMilliseconds >= _heartbeatIntervalMillis)
+                    {
+                        _heartbeatStopwatch.Restart();
+                        var heartbeatMsg = new SubscriptionActionMessageRequest<string>() { Action = SubscriptionActionType.Heartbeat, AuthToken = authToken, RequestId = _requestId++, Value = new string[] { accountNumber } };
+                        var heartbeatMsgBody = JsonSerializer.Serialize(heartbeatMsg);
 
-                    ArraySegment<byte> heartBeatBytesToSend = new ArraySegment<byte>(Encoding.UTF8.GetBytes(heartbeatMsgBody));
-                    ws.SendAsync(heartBeatBytesToSend, WebSocketMessageType.Text, true, source.Token).GetAwaiter().GetResult();
-                    Console.WriteLine($"heartbeat sent: {DateTime.UtcNow.ToString("yyyyMMddHHmmss")}");
+                        ArraySegment<byte> heartBeatBytesToSend = new ArraySegment<byte>(Encoding.UTF8.GetBytes(heartbeatMsgBody));
+                        ws.SendAsync(heartBeatBytesToSend, WebSocketMessageType.Text, true, source.Token).GetAwaiter().GetResult();
+                        Console.WriteLine($"heartbeat sent: {DateTime.UtcNow.ToString("yyyyMMddHHmmss")}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Heartbeat send failed: {ex}");
                 }
             }, null, _heartbeatIntervalMillis, _heartbeatIntervalMillis);
 
+            // Connect and send subscribe (connect) message
             await ws.ConnectAsync(new Uri(credentials.StreamingApiBaseUrl), CancellationToken.None);
 
-            var connectMsg = new SubscriptionActionMessageRequest<string>() { Action = SubscriptionActionType.Connect, AuthToken = authToken, RequestId = _requestId++, Value = new string[] { credentials.AccountNumber } };
+            var connectMsg = new SubscriptionActionMessageRequest<string>() { Action = SubscriptionActionType.Connect, AuthToken = authToken, RequestId = _requestId++, Value = new string[] { accountNumber } };
             var connectMsgBody = JsonSerializer.Serialize(connectMsg);
 
             ArraySegment<byte> bytesToSend = new ArraySegment<byte>(Encoding.UTF8.GetBytes(connectMsgBody));
             await ws.SendAsync(bytesToSend, WebSocketMessageType.Text, true, source.Token);
 
-            byte[] buffer = new byte[4096];
-
-            while (ws.State == WebSocketState.Open && _accountUpdates.ConnectionStatus != AccountDataUpdatesConnectionStatus.Fault)
+            // Start background receive loop so caller regains control immediately and can place orders.
+            _ = Task.Run(async () =>
             {
-                // exec waits on receive here, so heartbeat has to be in a separate task or code won't fire heart beat until another update comes through which means socket will likley die in 10 to 15 seconds
-                var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
-                if (result.MessageType == WebSocketMessageType.Close)
+                byte[] buffer = new byte[4096];
+                try
                 {
-                    await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
-                    _accountUpdates.ConnectionStatus = AccountDataUpdatesConnectionStatus.Closed;
+                    while (ws.State == WebSocketState.Open && _accountUpdates.ConnectionStatus != AccountDataUpdatesConnectionStatus.Fault)
+                    {
+                        var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None);
+                        if (result.MessageType == WebSocketMessageType.Close)
+                        {
+                            try
+                            {
+                                await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error closing websocket: {ex}");
+                            }
+                            _accountUpdates.ConnectionStatus = AccountDataUpdatesConnectionStatus.Closed;
+                        }
+                        else
+                        {
+                            try
+                            {
+                                HandleMessage(_accountUpdates, buffer, result.Count);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error handling message: {ex}");
+                            }
+                        }
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    HandleMessage(_accountUpdates, buffer, result.Count);
+                    Console.WriteLine($"Streaming background loop faulted: {ex}");
+                    _accountUpdates.ConnectionStatus = AccountDataUpdatesConnectionStatus.Fault;
                 }
-            }
-            await heartbeatTimer.DisposeAsync();
-            Console.WriteLine($"{nameof(AccountStreamer)} runloop exited: {DateTime.UtcNow:yyyyMMddHHmmss}");
+                finally
+                {
+                    try
+                    {
+                        await heartbeatTimer.DisposeAsync();
+                    }
+                    catch { /* ignore */ }
+                    try
+                    {
+                        ws.Dispose();
+                    }
+                    catch { /* ignore */ }
+                    try
+                    {
+                        source.Dispose();
+                    }
+                    catch { /* ignore */ }
+
+                    Console.WriteLine($"{nameof(AccountStreamer)} runloop exited: {DateTime.UtcNow:yyyyMMddHHmmss}");
+                }
+            });
+
+            // Return immediately — caller can check accountUpdates.ConnectionStatus and read OrderUpdates queue.
             return _accountUpdates;
         }
 

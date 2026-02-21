@@ -18,7 +18,7 @@
         public decimal Theta {  get; set; }
         public decimal ThetaPerDay { get; set; }
         public decimal Vega { get; set; }
-        public decimal ImpliedVolatility { get; set; }
+        public decimal? ImpliedVolatility { get; set; }
     
     }
 }

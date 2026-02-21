@@ -17,64 +17,95 @@ public class OptionChain
     public OptionChainUnderlying PreviousUnderlying { get; internal set; }
     private IOptionGreekProvider _greekProvider;
 
+    // Parameterless ctor: ensures consumers always receive an OptionChain with empty collections (no nulls)
+    public OptionChain()
+    {
+        _greekProvider = new DefaultGreekProvider();
+        Expirations = new List<OptionChainExpiration>();
+        AllExpirations = new List<OptionChainExpiration>();
+        Underlying = new OptionChainUnderlying();
+        PreviousUnderlying = new OptionChainUnderlying();
+    }
+
     public OptionChain(EquityResponse underlying, OptionChainResponse response, IOptionGreekProvider greeksProvider)
     {
-        _greekProvider = greeksProvider;
-        Expirations = [];
-        AllExpirations = [];
+        _greekProvider = greeksProvider ?? new DefaultGreekProvider();
+        Expirations = new List<OptionChainExpiration>();
+        AllExpirations = new List<OptionChainExpiration>();
         Underlying = new OptionChainUnderlying
         {
-            Symbol = underlying.Data.Symbol,
-            StreamerSymbol = underlying.Data.StreamerSymbol
+            Symbol = underlying?.Data?.Symbol ?? string.Empty,
+            StreamerSymbol = underlying?.Data?.StreamerSymbol ?? string.Empty
         };
         PreviousUnderlying = new OptionChainUnderlying
         {
-            Symbol = underlying.Data.Symbol,
-            StreamerSymbol = underlying.Data.StreamerSymbol
+            Symbol = underlying?.Data?.Symbol ?? string.Empty,
+            StreamerSymbol = underlying?.Data?.StreamerSymbol ?? string.Empty
         };
         SetExpirations(response);
     }
 
     public OptionChain(FutureContractResponse underlying, OptionChainResponse response)
     {
-        Expirations = [];
+        _greekProvider = new DefaultGreekProvider();
+        Expirations = new List<OptionChainExpiration>();
+        AllExpirations = new List<OptionChainExpiration>();
         Underlying = new OptionChainUnderlying
         {
-            Symbol = underlying.Contract.Symbol,
-            StreamerSymbol = underlying.Contract.StreamerSymbol
+            Symbol = underlying?.Contract?.Symbol ?? string.Empty,
+            StreamerSymbol = underlying?.Contract?.StreamerSymbol ?? string.Empty
         };
         PreviousUnderlying = new OptionChainUnderlying
         {
-            Symbol = underlying.Contract.Symbol,
-            StreamerSymbol = underlying.Contract.StreamerSymbol
+            Symbol = underlying?.Contract?.Symbol ?? string.Empty,
+            StreamerSymbol = underlying?.Contract?.StreamerSymbol ?? string.Empty
         };
         SetExpirations(response);
     }
 
     private void SetExpirations(OptionChainResponse response)
     {
+        // Guard against null data
+        if (response?.Data?.Items == null)
+            return;
+
         var expirations = response.Data.Items.Where(x => x.Active).GroupBy(x => x.ExpirationDate).OrderBy(x => x.Key);
         foreach (var item in expirations)
         {
             var expiration = new OptionChainExpiration()
             {
                 ExpirationDate = item.Key,
-                Items = []
+                Items = new List<OptionChainExpirationItem>()
             };
             var strikes = item.GroupBy(x => x.StrikePrice).OrderBy(x => x.Key);
             foreach (var strike in strikes)
             {
+                // Ensure both call and put exist for the strike — guard First(...) calls
+                var callEntry = strike.FirstOrDefault(x => x.OptionType == "C");
+                var putEntry = strike.FirstOrDefault(x => x.OptionType == "P");
+
+                // Create sides only if the entry exists to avoid null-reference problems later.
+                var callSide = callEntry == null
+                    ? null
+                    : new OptionChainItemSide
+                    {
+                        StreamerSymbol = callEntry.StreamerSymbol ?? string.Empty,
+                        OptionSymbol = callEntry.Symbol ?? string.Empty
+                    };
+
+                var putSide = putEntry == null
+                    ? null
+                    : new OptionChainItemSide
+                    {
+                        StreamerSymbol = putEntry.StreamerSymbol ?? string.Empty,
+                        OptionSymbol = putEntry.Symbol ?? string.Empty
+                    };
+
                 expiration.Items.Add(new OptionChainExpirationItem
                 {
-                    Strike = Convert.ToDecimal( strike.Key ),
-                    Call = new OptionChainItemSide
-                    {
-                        StreamerSymbol = strike.First(x => x.OptionType == "C").StreamerSymbol
-                    },
-                    Put = new OptionChainItemSide
-                    {
-                        StreamerSymbol = strike.First(x => x.OptionType == "P").StreamerSymbol
-                    }
+                    Strike = Convert.ToDecimal(strike.Key),
+                    Call = callSide,
+                    Put = putSide
                 });
             }
             Expirations.Add(expiration);
@@ -87,22 +118,41 @@ public class OptionChain
     }
     public void SelectNextExpiration(DateTime onOrAfter, TimeSpan until)
     {
+        if (AllExpirations == null || AllExpirations.Count == 0)
+        {
+            Expirations = new List<OptionChainExpiration>();
+            return;
+        }
+
         var nextExpirationDate = GetNextExpirationDate(onOrAfter);
-        Expirations = AllExpirations.Where(x => (x.ExpirationDateToDateTime()) >= nextExpirationDate && (x.ExpirationDateToDateTime()) <= nextExpirationDate).ToList();
+        Expirations = AllExpirations
+            .Where(x =>
+            {
+                var dt = x.ExpirationDateToDateTime();
+                return dt >= nextExpirationDate && dt <= nextExpirationDate;
+            })
+            .ToList();
     }
 
     private DateTime GetNextExpirationDate(DateTime onOrAfter)
     {
-        return Expirations.OrderBy(e=>e.ExpirationDateToDateTime()).FirstOrDefault(x =>
-            ((x.ExpirationDateToDateTime()) - onOrAfter).Days > 0)
-            .ExpirationDateToDateTime();
+        if (AllExpirations == null || AllExpirations.Count == 0)
+            return onOrAfter;
+
+        var next = AllExpirations
+            .Select(e => e.ExpirationDateToDateTime())
+            .Where(d => (d - onOrAfter).Days > 0)
+            .OrderBy(d => d)
+            .FirstOrDefault();
+
+        return next == default ? onOrAfter : next;
     }
 
     public void UpdateQuote(Quote quote)
     {
         UpdatedOn = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
 
-        if (Underlying.Symbol == quote.EventSymbol)
+        if (Underlying != null && Underlying.Symbol == quote.EventSymbol)
         {
             PreviousUnderlying.Bid = Underlying.Bid;
             PreviousUnderlying.Ask = Underlying.Ask;
@@ -112,15 +162,15 @@ public class OptionChain
         }
         else
         {
-            foreach (var expiration in Expirations)
+            foreach (var expiration in Expirations ?? Enumerable.Empty<OptionChainExpiration>())
             {
                 var ttm = expiration.ExpirationDateToDateTime() - DateTime.UtcNow; //TODO: not quite right, but very close
-                foreach (var item in expiration.Items)
+                foreach (var item in expiration.Items ?? Enumerable.Empty<OptionChainExpirationItem>())
                 {
-                    var midUnderlyingPrice = Convert.ToDecimal( Underlying.Bid + ((Underlying.Ask - Underlying.Bid) / 2.0d) );
-                    var midOptionPrice = Convert.ToDecimal( quote.BidPrice + ((quote.AskPrice - quote.BidPrice) / 2.0d) );
+                    var midUnderlyingPrice = Convert.ToDecimal(Underlying.Bid + ((Underlying.Ask - Underlying.Bid) / 2.0d));
+                    var midOptionPrice = Convert.ToDecimal(quote.BidPrice + ((quote.AskPrice - quote.BidPrice) / 2.0d));
 
-                    if (item.Call.StreamerSymbol == quote.EventSymbol)
+                    if (item.Call?.StreamerSymbol == quote.EventSymbol)
                     {
                         if (Convert.ToDecimal(quote.BidPrice) != item.Call.Bid && Underlying.Bid != PreviousUnderlying.Bid)
                             item.Call.Delta = (Convert.ToDecimal(quote.BidPrice) - item.Call.Bid) / (Convert.ToDecimal(Underlying.Bid) - Convert.ToDecimal(PreviousUnderlying.Bid));
@@ -132,25 +182,33 @@ public class OptionChain
                         item.Call.Theta = callGreeks.Theta;
                         item.Call.Vega = callGreeks.Vega;
                         item.Call.ImpliedVolatility = callGreeks.ImpliedVolatility;
-
                     }
-                    else if (item.Put.StreamerSymbol == quote.EventSymbol)
+                    else if (item.Put?.StreamerSymbol == quote.EventSymbol)
                     {
                         if (Convert.ToDecimal(quote.BidPrice) != item.Put.Bid && Underlying.Bid != PreviousUnderlying.Bid)
-                            item.Put.Delta = Convert.ToDecimal( (Convert.ToDecimal(quote.BidPrice) - item.Put.Bid) / (Convert.ToDecimal(Underlying.Bid) - Convert.ToDecimal(PreviousUnderlying.Bid)) );
-                        item.Put.Bid = Convert.ToDecimal( quote.BidPrice );
-                        item.Put.Ask = Convert.ToDecimal( quote.AskPrice );
+                            item.Put.Delta = Convert.ToDecimal((Convert.ToDecimal(quote.BidPrice) - item.Put.Bid) / (Convert.ToDecimal(Underlying.Bid) - Convert.ToDecimal(PreviousUnderlying.Bid)));
+                        item.Put.Bid = Convert.ToDecimal(quote.BidPrice);
+                        item.Put.Ask = Convert.ToDecimal(quote.AskPrice);
 
                         var putGreeks = _greekProvider.GetGreeks(OptionType.Put, midUnderlyingPrice, midOptionPrice, item.Strike, ttm.Days, 0.0m, 0.0m);
                         item.Put.Delta = putGreeks.Delta;
                         item.Put.Theta = putGreeks.Theta;
                         item.Put.Vega = putGreeks.Vega;
                         item.Put.ImpliedVolatility = putGreeks.ImpliedVolatility;
-
                     }
-                    item.IsAtTheMoney = item.Strike == Convert.ToDecimal( Math.Floor(Underlying.Bid)) ||  item.Strike == Convert.ToDecimal( Math.Floor(Underlying.Ask) );
+
+                    item.IsAtTheMoney = item.Strike == Convert.ToDecimal(Math.Floor(Underlying.Bid)) || item.Strike == Convert.ToDecimal(Math.Floor(Underlying.Ask));
                 }
             }
+        }
+    }
+
+    // default no-op provider so OptionChain is safe to use even if no provider was supplied
+    private class DefaultGreekProvider : IOptionGreekProvider
+    {
+        public Greeks GetGreeks(OptionType optionType, decimal underlyingPrice, decimal optionMarketPrice, decimal strike, decimal timeToExpiryCalendarDays, decimal interestRates, decimal dividends)
+        {
+            return new Greeks() { Delta = decimal.Zero, Theta = decimal.Zero, Vega = decimal.Zero, ImpliedVolatility = decimal.Zero };
         }
     }
 }
@@ -185,10 +243,11 @@ public class OptionChainExpirationItem
 public class OptionChainItemSide
 {
     public string StreamerSymbol { get; set; }
-    public decimal Bid { get; internal set; }
-    public decimal Ask { get; internal set; }
-    public decimal Delta { get; internal set; }
-    public decimal Theta { get; internal set; }
-    public decimal Vega { get; internal set; }
-    public decimal ImpliedVolatility { get; internal set; }
+    public string OptionSymbol { get; set; }
+    public decimal Bid { get; set; }
+    public decimal Ask { get; set; }
+    public decimal Delta { get; set; }
+    public decimal Theta { get; set; }
+    public decimal Vega { get; set; }
+    public decimal? ImpliedVolatility { get; set; }
 }

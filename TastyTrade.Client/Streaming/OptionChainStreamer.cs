@@ -10,16 +10,16 @@ namespace TastyTrade.Client.Streaming;
 public static class OptionChainStreamer
 {
     
-    public static async Task Run(AuthorizationCredentials credentials, string symbol, DateTime onOrAfter)
+    public static async Task Run(TastyOAuthCredentials credentials, string symbol, DateTime onOrAfter)
     {
         var optChain = await BeingStreamingOptionChain(credentials, symbol, onOrAfter, TimeSpan.Zero);
     }
     
-    public static async Task<OptionChain> BeingStreamingOptionChain(AuthorizationCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until)
+    public static async Task<OptionChain> BeingStreamingOptionChain(TastyOAuthCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until)
     {
         return await BeingStreamingOptionChain(credentials, symbol, onOrAfter, until, new NoOpGreeksProvider());
     }
-    public static async Task<OptionChain> BeingStreamingOptionChain(AuthorizationCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until, IOptionGreekProvider greeksProvider)
+    public static async Task<OptionChain> BeingStreamingOptionChain(TastyOAuthCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until, IOptionGreekProvider greeksProvider)
     {
         var tastyTradeClient = new TastyTradeClient();
         await tastyTradeClient.Authenticate(credentials);

@@ -75,12 +75,12 @@ namespace TastyTrade.Client.Streaming
             _accountUpdateKeySerializationPropertyNameMap.Add(_SubscriptionActionMessageResponse_Action, actionMessageActionTypeSerializationValue);
         }
 
-        public static async Task Run(AuthorizationCredentials credentials)
+        public static async Task Run(TastyOAuthCredentials credentials, string accountNumber)
         {
-            var accountUpdate = await BeginStreamingAccounts(credentials);
+            var accountUpdate = await BeginStreamingAccounts(credentials, accountNumber);
         }
 
-        public static async Task<AccountDataUpdates> BeginStreamingAccounts(AuthorizationCredentials credentials)
+        public static async Task<AccountDataUpdates> BeginStreamingAccounts(TastyOAuthCredentials credentials, string accountNumber)
         {
             // Prepare and authenticate
             AccountDataUpdates _accountUpdates = new AccountDataUpdates();
@@ -105,7 +105,7 @@ namespace TastyTrade.Client.Streaming
                         && _heartbeatStopwatch.ElapsedMilliseconds >= _heartbeatIntervalMillis)
                     {
                         _heartbeatStopwatch.Restart();
-                        var heartbeatMsg = new SubscriptionActionMessageRequest<string>() { Action = SubscriptionActionType.Heartbeat, AuthToken = authToken, RequestId = _requestId++, Value = new string[] { credentials.AccountNumber } };
+                        var heartbeatMsg = new SubscriptionActionMessageRequest<string>() { Action = SubscriptionActionType.Heartbeat, AuthToken = authToken, RequestId = _requestId++, Value = new string[] { accountNumber } };
                         var heartbeatMsgBody = JsonSerializer.Serialize(heartbeatMsg);
 
                         ArraySegment<byte> heartBeatBytesToSend = new ArraySegment<byte>(Encoding.UTF8.GetBytes(heartbeatMsgBody));
@@ -122,7 +122,7 @@ namespace TastyTrade.Client.Streaming
             // Connect and send subscribe (connect) message
             await ws.ConnectAsync(new Uri(credentials.StreamingApiBaseUrl), CancellationToken.None);
 
-            var connectMsg = new SubscriptionActionMessageRequest<string>() { Action = SubscriptionActionType.Connect, AuthToken = authToken, RequestId = _requestId++, Value = new string[] { credentials.AccountNumber } };
+            var connectMsg = new SubscriptionActionMessageRequest<string>() { Action = SubscriptionActionType.Connect, AuthToken = authToken, RequestId = _requestId++, Value = new string[] { accountNumber } };
             var connectMsgBody = JsonSerializer.Serialize(connectMsg);
 
             ArraySegment<byte> bytesToSend = new ArraySegment<byte>(Encoding.UTF8.GetBytes(connectMsgBody));

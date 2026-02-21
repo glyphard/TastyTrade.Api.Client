@@ -6,6 +6,7 @@ using System.Net.Http.Headers;
 using System.Reflection.Metadata.Ecma335;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using TastyTrade.Client.Model;
 using TastyTrade.Client.Model.Request;
 using TastyTrade.Client.Model.Response;
@@ -17,7 +18,45 @@ public class TastyTradeClient
     private AuthenticationResponse _authenticationResponse;
     private string _userAgent;
     private string _baseUrl;
+
+    private string _accessToken;
+    private string _refreshToken;
+    private string _clientId;
+    private string _clientSecret;
+
     public AuthenticationResponse GetAuthenticationResponse() { return _authenticationResponse; }
+
+    /// <summary>
+    /// Authenticates using OAuth2 flow with client credentials and refresh token.
+    /// Stores the access token for subsequent API calls.
+    /// </summary>
+    /// <param name="credentials">Authorization credentials containing OAuth2 parameters</param>
+    /// <param name="clientId">OAuth2 client ID</param>
+    /// <param name="clientSecret">OAuth2 client secret</param>
+    /// <param name="refreshToken">OAuth2 refresh token</param>
+    public async Task AuthenticateOAuth(TastyOAuthCredentials credentials)
+    {
+        if (string.IsNullOrWhiteSpace(credentials.ClientId)) throw new ArgumentException("clientId is required", nameof(credentials.ClientId));
+        if (string.IsNullOrWhiteSpace(credentials.ClientSecret)) throw new ArgumentException("clientSecret is required", nameof(credentials.ClientSecret));
+        if (string.IsNullOrWhiteSpace(credentials.RefreshToken)) throw new ArgumentException("refreshToken is required", nameof(credentials.RefreshToken));
+
+        _userAgent = credentials.UserAgent;
+        _baseUrl = credentials.ApiBaseUrl;
+        _clientId = credentials.ClientId;
+        _clientSecret = credentials.ClientSecret;
+        _refreshToken = credentials.RefreshToken;
+
+        // Obtain access token via OAuth2
+        _accessToken = await GetAccessTokenAsync();
+    }
+    public async Task Authenticate(TastyOAuthCredentials credentials)
+    {
+        await AuthenticateOAuth(credentials);
+    }
+        /// <summary>
+        /// Legacy session-based authentication (deprecated - use AuthenticateOAuth for new implementations)
+        /// </summary>
+        [Obsolete("Use AuthenticateOAuth for OAuth2-based authentication", true)]
     public async Task Authenticate(AuthorizationCredentials credentials)
     {
         _userAgent = credentials.UserAgent;
@@ -31,6 +70,57 @@ public class TastyTradeClient
         var responseJson = await response.Content.ReadAsStringAsync();
         _authenticationResponse = JsonSerializer.Deserialize<AuthenticationResponse>(responseJson);
     }
+
+    /// <summary>
+    /// Obtains an OAuth2 access token using the refresh token grant type.
+    /// </summary>
+    private async Task<string> GetAccessTokenAsync()
+    {
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent ?? "TastyTradeClient/1.0");
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+
+        var formData = new Dictionary<string, string>
+        {
+            { "grant_type", "refresh_token" },
+            { "refresh_token", _refreshToken },
+            { "client_id", _clientId },
+            { "client_secret", _clientSecret }
+        };
+
+        using var content = new FormUrlEncodedContent(formData);
+        var response = await client.PostAsync($"{_baseUrl}/oauth/token", content);
+        var responseJson = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"OAuth token request failed: {response.StatusCode} - {responseJson}");
+        }
+
+        using var doc = JsonDocument.Parse(responseJson);
+        if (doc.RootElement.TryGetProperty("access_token", out var token))
+            return token.GetString() ?? throw new InvalidOperationException("access_token was null");
+
+        if (doc.RootElement.TryGetProperty("data", out var data) &&
+            data.TryGetProperty("access_token", out var nestedToken))
+            return nestedToken.GetString() ?? throw new InvalidOperationException("data.access_token was null");
+
+        throw new InvalidOperationException($"OAuth response did not include access_token: {responseJson}");
+    }
+
+    /// <summary>
+    /// Refreshes the OAuth2 access token if needed. Can be called manually or automatically when a 401 is detected.
+    /// </summary>
+    public async Task RefreshAccessTokenAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_clientId) || string.IsNullOrWhiteSpace(_clientSecret) || string.IsNullOrWhiteSpace(_refreshToken))
+        {
+            throw new InvalidOperationException("OAuth credentials not configured. Use AuthenticateOAuth first.");
+        }
+
+        _accessToken = await GetAccessTokenAsync();
+    }
+
     public async Task<CustomerResponse> GetCustomer()
     {
         var response = await Get($"{_baseUrl}/customers/me");
@@ -111,11 +201,82 @@ public class TastyTradeClient
         chain.Data.Items = [.. chain.Data.Items.Where(x => x.Active).OrderBy(x => x.StrikePrice)];
         return chain;
     }
+
+    // Decorator method: keeps original simple call but delegates to the overload that supports date range + pagination.
     public async Task<TransactionsResponse> GetTransactions(string accountNumber)
     {
-        var sinceWhen = DateTime.UtcNow.AddMonths(-12).ToString("yyyy-MM-dd");
-        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/transactions?per-page=999&start-date={sinceWhen}");
-        return JsonSerializer.Deserialize<TransactionsResponse>(response);
+        var sinceWhen = DateTime.UtcNow.AddMonths(-12);
+        var untilWhen = DateTime.UtcNow;
+        return await GetTransactions(accountNumber, sinceWhen, untilWhen);
+    }
+
+    // Implementation: fetches all pages using pagination (top-level "pagination" object) and aggregates items.
+    public async Task<TransactionsResponse> GetTransactions(string accountNumber, DateTime startDate, DateTime endDate)
+    {
+        if (string.IsNullOrWhiteSpace(accountNumber)) throw new ArgumentException("accountNumber is required", nameof(accountNumber));
+        var aggregatedItems = new List<TransactionsResponseDataItem>();
+
+        const int perPage = 500;
+        int pageOffset = 0;
+        int totalPages = 1; // default to 1; will be replaced by pagination data when present
+
+        while (pageOffset < totalPages)
+        {
+            var url = $"{_baseUrl}/accounts/{accountNumber}/transactions?per-page={perPage}&start-date={startDate:yyyy-MM-dd}&end-date={endDate:yyyy-MM-dd}&page-offset={pageOffset}";
+            var responseText = await Get(url);
+            if (string.IsNullOrWhiteSpace(responseText))
+            {
+                break;
+            }
+
+            using var doc = JsonDocument.Parse(responseText);
+            var root = doc.RootElement;
+
+            // Extract data.items if present
+            if (root.TryGetProperty("data", out var dataElement) && dataElement.TryGetProperty("items", out var itemsElement) && itemsElement.ValueKind == JsonValueKind.Array)
+            {
+                // Deserialize page items into the typed list and append
+                var pageItems = JsonSerializer.Deserialize<List<TransactionsResponseDataItem>>(itemsElement.GetRawText());
+                if (pageItems != null && pageItems.Count > 0)
+                {
+                    aggregatedItems.AddRange(pageItems);
+                }
+            }
+
+            // Read pagination info if present to determine loop termination
+            if (root.TryGetProperty("pagination", out var pagination))
+            {
+                // preferred: use total-pages if available
+                if (pagination.TryGetProperty("total-pages", out var totalPagesProp) && totalPagesProp.ValueKind == JsonValueKind.Number)
+                {
+                    totalPages = totalPagesProp.GetInt32();
+                }
+                else
+                {
+                    // fallback: use total-items to compute pages if available
+                    if (pagination.TryGetProperty("total-items", out var totalItemsProp) && totalItemsProp.ValueKind == JsonValueKind.Number)
+                    {
+                        var totalItems = totalItemsProp.GetInt32();
+                        totalPages = Math.Max(1, (int)Math.Ceiling(totalItems / (double)perPage));
+                    }
+                }
+            }
+            else
+            {
+                // No pagination present -> single page only
+                break;
+            }
+
+            pageOffset++;
+        }
+
+        return new TransactionsResponse
+        {
+            Data = new TransactionsResponseData
+            {
+                Items = aggregatedItems
+            }
+        };
     }
 
 
@@ -193,17 +354,37 @@ public class TastyTradeClient
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_authenticationResponse.Data.SessionToken);
+        
+        // Use Bearer token authentication if OAuth2 is configured; otherwise fall back to session token
+        if (!string.IsNullOrWhiteSpace(_accessToken))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        }
+        else if (_authenticationResponse?.Data?.SessionToken != null)
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_authenticationResponse.Data.SessionToken);
+        }
+
         var response = await client.GetAsync(url);
         return await response.Content.ReadAsStringAsync();
     }
+
     private async Task<string> Post(string url, string jsonBody)
     {
         var uri = new Uri(url);
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_authenticationResponse.Data.SessionToken);
+        
+        // Use Bearer token authentication if OAuth2 is configured; otherwise fall back to session token
+        if (!string.IsNullOrWhiteSpace(_accessToken))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        }
+        else if (_authenticationResponse?.Data?.SessionToken != null)
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_authenticationResponse.Data.SessionToken);
+        }
 
         using var content = new StringContent( jsonBody );
         content.Headers.ContentType = new MediaTypeHeaderValue(Constants.ContentType);

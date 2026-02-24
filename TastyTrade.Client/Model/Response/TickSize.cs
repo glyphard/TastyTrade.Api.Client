@@ -1,12 +1,15 @@
 using System.Text.Json.Serialization;
+using TastyTrade.Client.Model.Helper;
 
 namespace TastyTrade.Client.Model.Response;
 
 public class TickSize
 {
     [JsonPropertyName("value")]
-    public string Value { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? Value { get; set; }
 
     [JsonPropertyName("threshold")]
-    public string Threshold { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? Threshold { get; set; }
 }

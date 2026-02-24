@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using TastyTrade.Client.Model.Helper;
 
 namespace TastyTrade.Client.Model.Response
 {
@@ -52,7 +53,8 @@ namespace TastyTrade.Client.Model.Response
         public string AverageDailyMarketClosePrice { get; set; }
 
         [JsonPropertyName("multiplier")]
-        public int Multiplier { get; set; }
+        [JsonConverter(typeof(DecimalOrStringJsonConverter))]
+        public decimal Multiplier { get; set; }
 
         [JsonPropertyName("cost-effect")]
         public string CostEffect { get; set; }

@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using TastyTrade.Client.Model.Helper;
 using TastyTrade.Client.Model.Request;
 
 namespace TastyTrade.Client.Model.Response
@@ -53,7 +54,8 @@ namespace TastyTrade.Client.Model.Response
         public string OrderType { get; set; }
 
         [JsonPropertyName("price")]
-        public string Price { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? Price { get; set; }
 
         [JsonPropertyName("price-effect")]
         public string PriceEffect { get; set; }
@@ -131,28 +133,33 @@ namespace TastyTrade.Client.Model.Response
     public class BuyingPowerChangeEffect
     {
         [JsonPropertyName("change-in-margin-requirement")]
-        public string ChangeInMarginRequirement { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? ChangeInMarginRequirement { get; set; }
 
         [JsonPropertyName("change-in-margin-requirement-effect")]
         public string ChangeInMarginRequirementEffect { get; set; }
 
         [JsonPropertyName("change-in-buying-power")]
-        public string ChangeInBuyingPower { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? ChangeInBuyingPower { get; set; }
 
         [JsonPropertyName("current-buying-power-effect")]
         public string CurrentBuyingPowerEffect { get; set; }
 
         [JsonPropertyName("current-buying-power")]
-        public string CurrentBuyingPower { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? CurrentBuyingPower { get; set; }
 
         [JsonPropertyName("new-buying-power")]
-        public string NewBuyingPower { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? NewBuyingPower { get; set; }
 
         [JsonPropertyName("new-buying-power-effect")]
         public string NewBuyingPowerEffect { get; set; }
 
         [JsonPropertyName("isolated-order-margin-requirement")]
-        public string IsolatedOrderMarginRequirement { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? IsolatedOrderMarginRequirement { get; set; }
 
         [JsonPropertyName("isolated-order-margin-requirement-effect")]
         public string IsolatedOrderMarginRequirementEffect { get; set; }
@@ -170,7 +177,8 @@ namespace TastyTrade.Client.Model.Response
     public class FeeCalculation
     {
         [JsonPropertyName("regulatory-fees")]
-        public string RegulatoryFees { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? RegulatoryFees { get; set; }
 
         [JsonPropertyName("regulatory-fees-effect")]
         public string RegulatoryFeesEffect { get; set; }
@@ -179,7 +187,8 @@ namespace TastyTrade.Client.Model.Response
         public List<FeeBreakdown> RegulatoryFeesBreakdown { get; set; }
 
         [JsonPropertyName("clearing-fees")]
-        public string ClearingFees { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? ClearingFees { get; set; }
 
         [JsonPropertyName("clearing-fees-effect")]
         public string ClearingFeesEffect { get; set; }
@@ -188,7 +197,8 @@ namespace TastyTrade.Client.Model.Response
         public List<FeeBreakdown> ClearingFeesBreakdown { get; set; }
 
         [JsonPropertyName("commission")]
-        public string Commission { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? Commission { get; set; }
 
         [JsonPropertyName("commission-effect")]
         public string CommissionEffect { get; set; }
@@ -197,7 +207,8 @@ namespace TastyTrade.Client.Model.Response
         public List<FeeBreakdown> CommissionBreakdown { get; set; }
 
         [JsonPropertyName("proprietary-index-option-fees")]
-        public string ProprietaryIndexOptionFees { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? ProprietaryIndexOptionFees { get; set; }
 
         [JsonPropertyName("proprietary-index-option-fees-effect")]
         public string ProprietaryIndexOptionFeesEffect { get; set; }

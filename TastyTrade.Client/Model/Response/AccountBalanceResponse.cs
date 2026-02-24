@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text.Json.Serialization;
+using TastyTrade.Client.Model.Helper;
 
 namespace TastyTrade.Client.Model.Response;
 
@@ -18,157 +19,204 @@ public class AccountBalanceData
     public string AccountNumber { get; set; }
 
     [JsonPropertyName("available-trading-funds")]
-    public string AvailableTradingFunds { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? AvailableTradingFunds { get; set; }
 
     [JsonPropertyName("bond-margin-requirement")]
-    public string BondMarginRequirement { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? BondMarginRequirement { get; set; }
 
     [JsonPropertyName("cash-available-to-withdraw")]
-    public string CashAvailableToWithdraw { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? CashAvailableToWithdraw { get; set; }
 
     [JsonPropertyName("cash-balance")]
-    public string CashBalance { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? CashBalance { get; set; }
 
     [JsonPropertyName("cash-settle-balance")]
-    public string CashSettleBalance { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? CashSettleBalance { get; set; }
 
     [JsonPropertyName("closed-loop-available-balance")]
-    public string ClosedLoopAvailableBalance { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? ClosedLoopAvailableBalance { get; set; }
 
     [JsonPropertyName("cryptocurrency-margin-requirement")]
-    public string CryptocurrencyMarginRequirement { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? CryptocurrencyMarginRequirement { get; set; }
 
     [JsonPropertyName("currency")]
     public string Currency { get; set; }
 
     [JsonPropertyName("day-equity-call-value")]
-    public string DayEquityCallValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? DayEquityCallValue { get; set; }
 
     [JsonPropertyName("day-trade-excess")]
-    public string DayTradeExcess { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? DayTradeExcess { get; set; }
 
     [JsonPropertyName("day-trading-buying-power")]
-    public string DayTradingBuyingPower { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? DayTradingBuyingPower { get; set; }
 
     [JsonPropertyName("day-trading-call-value")]
-    public string DayTradingCallValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? DayTradingCallValue { get; set; }
 
     [JsonPropertyName("derivative-buying-power")]
-    public string DerivativeBuyingPower { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? DerivativeBuyingPower { get; set; }
 
     [JsonPropertyName("equity-buying-power")]
-    public string EquityBuyingPower { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? EquityBuyingPower { get; set; }
 
     [JsonPropertyName("equity-offering-margin-requirement")]
-    public string EquityOfferingMarginRequirement { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? EquityOfferingMarginRequirement { get; set; }
 
     [JsonPropertyName("futures-margin-requirement")]
-    public string FuturesMarginRequirement { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? FuturesMarginRequirement { get; set; }
 
     [JsonPropertyName("long-bond-value")]
-    public string LongBondValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? LongBondValue { get; set; }
 
     [JsonPropertyName("long-cryptocurrency-value")]
-    public string LongCryptocurrencyValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? LongCryptocurrencyValue { get; set; }
 
     [JsonPropertyName("long-derivative-value")]
-    public string LongDerivativeValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? LongDerivativeValue { get; set; }
 
     [JsonPropertyName("long-equity-value")]
-    public string LongEquityValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? LongEquityValue { get; set; }
 
     [JsonPropertyName("long-futures-derivative-value")]
-    public string LongFuturesDerivativeValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? LongFuturesDerivativeValue { get; set; }
 
     [JsonPropertyName("long-futures-value")]
-    public string LongFuturesValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? LongFuturesValue { get; set; }
 
     [JsonPropertyName("long-margineable-value")]
-    public string LongMargineableValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? LongMargineableValue { get; set; }
 
     [JsonPropertyName("maintenance-call-value")]
-    public string MaintenanceCallValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? MaintenanceCallValue { get; set; }
 
     [JsonPropertyName("maintenance-requirement")]
-    public string MaintenanceRequirement { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? MaintenanceRequirement { get; set; }
 
     [JsonPropertyName("margin-equity")]
-    public string MarginEquity { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? MarginEquity { get; set; }
 
     [JsonPropertyName("margin-settle-balance")]
-    public string MarginSettleBalance { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? MarginSettleBalance { get; set; }
 
     [JsonPropertyName("net-liquidating-value")]
-    public string NetLiquidatingValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? NetLiquidatingValue { get; set; }
 
     [JsonPropertyName("pending-cash")]
-    public string PendingCash { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? PendingCash { get; set; }
 
     [JsonPropertyName("pending-cash-effect")]
     public string PendingCashEffect { get; set; }
 
     [JsonPropertyName("reg-t-call-value")]
-    public string RegTCallValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? RegTCallValue { get; set; }
 
     [JsonPropertyName("short-cryptocurrency-value")]
-    public string ShortCryptocurrencyValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? ShortCryptocurrencyValue { get; set; }
 
     [JsonPropertyName("short-derivative-value")]
-    public string ShortDerivativeValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? ShortDerivativeValue { get; set; }
 
     [JsonPropertyName("short-equity-value")]
-    public string ShortEquityValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? ShortEquityValue { get; set; }
 
     [JsonPropertyName("short-futures-derivative-value")]
-    public string ShortFuturesDerivativeValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? ShortFuturesDerivativeValue { get; set; }
 
     [JsonPropertyName("short-futures-value")]
-    public string ShortFuturesValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? ShortFuturesValue { get; set; }
 
     [JsonPropertyName("short-margineable-value")]
-    public string ShortMargineableValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? ShortMargineableValue { get; set; }
 
     [JsonPropertyName("sma-equity-option-buying-power")]
-    public string SmaEquityOptionBuyingPower { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? SmaEquityOptionBuyingPower { get; set; }
 
     [JsonPropertyName("special-memorandum-account-apex-adjustment")]
-    public string SpecialMemorandumAccountApexAdjustment { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? SpecialMemorandumAccountApexAdjustment { get; set; }
 
     [JsonPropertyName("special-memorandum-account-value")]
-    public string SpecialMemorandumAccountValue { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? SpecialMemorandumAccountValue { get; set; }
 
     [JsonPropertyName("total-settle-balance")]
-    public string TotalSettleBalance { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? TotalSettleBalance { get; set; }
 
     [JsonPropertyName("unsettled-cryptocurrency-fiat-amount")]
-    public string UnsettledCryptocurrencyFiatAmount { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? UnsettledCryptocurrencyFiatAmount { get; set; }
 
     [JsonPropertyName("unsettled-cryptocurrency-fiat-effect")]
     public string UnsettledCryptocurrencyFiatEffect { get; set; }
 
     [JsonPropertyName("used-derivative-buying-power")]
-    public string UsedDerivativeBuyingPower { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? UsedDerivativeBuyingPower { get; set; }
 
     [JsonPropertyName("snapshot-date")]
     public string SnapshotDate { get; set; }
 
     [JsonPropertyName("reg-t-margin-requirement")]
-    public string RegTMarginRequirement { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? RegTMarginRequirement { get; set; }
 
     [JsonPropertyName("futures-overnight-margin-requirement")]
-    public string FuturesOvernightMarginRequirement { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? FuturesOvernightMarginRequirement { get; set; }
 
     [JsonPropertyName("futures-intraday-margin-requirement")]
-    public string FuturesIntradayMarginRequirement { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? FuturesIntradayMarginRequirement { get; set; }
 
     [JsonPropertyName("maintenance-excess")]
-    public string MaintenanceExcess { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? MaintenanceExcess { get; set; }
 
     [JsonPropertyName("pending-margin-interest")]
-    public string PendingMarginInterest { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? PendingMarginInterest { get; set; }
 
     [JsonPropertyName("effective-cryptocurrency-buying-power")]
-    public string EffectiveCryptocurrencyBuyingPower { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? EffectiveCryptocurrencyBuyingPower { get; set; }
 
     [JsonPropertyName("updated-at")]
     public DateTime UpdatedAt { get; set; }

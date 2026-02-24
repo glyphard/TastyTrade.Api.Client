@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using TastyTrade.Client.Model.Helper;
 
 namespace TastyTrade.Client.Model.Response;
 
@@ -31,7 +32,8 @@ public class OptionChainResponseDataItem
     public bool Active { get; set; }
 
     [JsonPropertyName("strike-price")]
-    public string StrikePrice { get; set; }
+    [JsonConverter(typeof(DecimalOrStringJsonConverter))]
+    public decimal StrikePrice { get; set; }
 
     [JsonPropertyName("root-symbol")]
     public string RootSymbol { get; set; }

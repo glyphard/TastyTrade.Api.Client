@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using TastyTrade.Client.Model.Helper;
 
 namespace TastyTrade.Client.Model.Response
 {
@@ -22,30 +23,37 @@ namespace TastyTrade.Client.Model.Response
     public class MarketMetricsInfoItem
     {
         [JsonPropertyName("implied-volatility-percentile")]
-        public string ImpliedVolatilityPercentile { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? ImpliedVolatilityPercentile { get; set; }
 
         [JsonPropertyName("liquidity-rank")]
-        public string LiquidityRank { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? LiquidityRank { get; set; }
 
         [JsonPropertyName("option-expiration-implied-volatilities")]
         public List<OptionExpirationImpliedVolatility> OptionExpirationImpliedVolatilities { get; set; }
 
         [JsonPropertyName("implied-volatility-rank")]
-        public string ImpliedVolatilityRank { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? ImpliedVolatilityRank { get; set; }
 
         [JsonPropertyName("implied-volatility-index")]
-        public string ImpliedVolatilityIndex { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? ImpliedVolatilityIndex { get; set; }
 
         [JsonPropertyName("liquidity")]
-        public string Liquidity { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? Liquidity { get; set; }
 
         [JsonPropertyName("implied-volatility-index-5-day-change")]
-        public string ImpliedVolatilityIndex5DayChange { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? ImpliedVolatilityIndex5DayChange { get; set; }
 
         [JsonPropertyName("symbol")]
         public string Symbol { get; set; }
 
         [JsonPropertyName("liquidity-rating")]
+        [JsonConverter(typeof(DecimalOrStringJsonConverter))]
         public decimal LiquidityRating { get; set; }
     }
 
@@ -61,6 +69,7 @@ namespace TastyTrade.Client.Model.Response
         public string OptionChainType { get; set; }
 
         [JsonPropertyName("implied-volatility")]
-        public string ImpliedVolatility { get; set; }
+        [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+        public decimal? ImpliedVolatility { get; set; }
     }
 }

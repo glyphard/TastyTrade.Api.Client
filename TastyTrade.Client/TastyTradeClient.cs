@@ -364,7 +364,7 @@ public class TastyTradeClient
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_authenticationResponse.Data.SessionToken);
         }
-
+        //this silently 401's after teh access token times out
         var response = await client.GetAsync(url);
         return await response.Content.ReadAsStringAsync();
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
+using TastyTrade.Client.Model.Helper;
 
 namespace TastyTrade.Client.Model.Response;
 
@@ -13,22 +14,28 @@ public class FutureContract
     public string ProductCode { get; set; }
 
     [JsonPropertyName("contract-size")]
-    public string ContractSize { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? ContractSize { get; set; }
 
     [JsonPropertyName("tick-size")]
-    public string TickSize { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? TickSize { get; set; }
 
     [JsonPropertyName("notional-multiplier")]
-    public string NotionalMultiplier { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? NotionalMultiplier { get; set; }
 
     [JsonPropertyName("main-fraction")]
-    public string MainFraction { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? MainFraction { get; set; }
 
     [JsonPropertyName("sub-fraction")]
-    public string SubFraction { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? SubFraction { get; set; }
 
     [JsonPropertyName("display-factor")]
-    public string DisplayFactor { get; set; }
+    [JsonConverter(typeof(DecimalOrStringNullableJsonConverter))]
+    public decimal? DisplayFactor { get; set; }
 
     [JsonPropertyName("last-trade-date")]
     public string LastTradeDate { get; set; }

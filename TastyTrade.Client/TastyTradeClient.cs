@@ -5,6 +5,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection.Metadata.Ecma335;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using TastyTrade.Client.Model;
@@ -23,6 +24,9 @@ public class TastyTradeClient
     private string _refreshToken;
     private string _clientId;
     private string _clientSecret;
+    private DateTime _tokenLastRefreshed;
+    private TimeSpan _refreshTokenLifetimeMax;
+    private readonly SemaphoreSlim _refreshLock = new SemaphoreSlim(1, 1);
 
     public AuthenticationResponse GetAuthenticationResponse() { return _authenticationResponse; }
 
@@ -31,10 +35,8 @@ public class TastyTradeClient
     /// Stores the access token for subsequent API calls.
     /// </summary>
     /// <param name="credentials">Authorization credentials containing OAuth2 parameters</param>
-    /// <param name="clientId">OAuth2 client ID</param>
-    /// <param name="clientSecret">OAuth2 client secret</param>
-    /// <param name="refreshToken">OAuth2 refresh token</param>
-    public async Task AuthenticateOAuth(TastyOAuthCredentials credentials)
+    /// <param name="refreshTokenLifetimeMax">Maximum time before proactively refreshing the token (default 17 minutes)</param>
+    public async Task AuthenticateOAuth(TastyOAuthCredentials credentials, TimeSpan? refreshTokenLifetimeMax = null)
     {
         if (string.IsNullOrWhiteSpace(credentials.ClientId)) throw new ArgumentException("clientId is required", nameof(credentials.ClientId));
         if (string.IsNullOrWhiteSpace(credentials.ClientSecret)) throw new ArgumentException("clientSecret is required", nameof(credentials.ClientSecret));
@@ -45,13 +47,15 @@ public class TastyTradeClient
         _clientId = credentials.ClientId;
         _clientSecret = credentials.ClientSecret;
         _refreshToken = credentials.RefreshToken;
+        _refreshTokenLifetimeMax = refreshTokenLifetimeMax ?? TimeSpan.FromMinutes(17);
 
         // Obtain access token via OAuth2
         _accessToken = await GetAccessTokenAsync();
+        _tokenLastRefreshed = DateTime.UtcNow;
     }
-    public async Task Authenticate(TastyOAuthCredentials credentials)
+    public async Task Authenticate(TastyOAuthCredentials credentials, TimeSpan? refreshTokenLifetimeMax = null)
     {
-        await AuthenticateOAuth(credentials);
+        await AuthenticateOAuth(credentials, refreshTokenLifetimeMax);
     }
         /// <summary>
         /// Legacy session-based authentication (deprecated - use AuthenticateOAuth for new implementations)
@@ -118,7 +122,39 @@ public class TastyTradeClient
             throw new InvalidOperationException("OAuth credentials not configured. Use AuthenticateOAuth first.");
         }
 
-        _accessToken = await GetAccessTokenAsync();
+        await _refreshLock.WaitAsync();
+        try
+        {
+            _accessToken = await GetAccessTokenAsync();
+            _tokenLastRefreshed = DateTime.UtcNow;
+        }
+        finally
+        {
+            _refreshLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Checks if the access token needs to be refreshed based on the configured lifetime.
+    /// </summary>
+    private bool ShouldRefreshToken()
+    {
+        if (string.IsNullOrWhiteSpace(_accessToken))
+            return false;
+
+        var timeSinceRefresh = DateTime.UtcNow - _tokenLastRefreshed;
+        return timeSinceRefresh >= _refreshTokenLifetimeMax;
+    }
+
+    /// <summary>
+    /// Proactively refreshes the token if it's approaching expiration.
+    /// </summary>
+    private async Task EnsureTokenFreshAsync()
+    {
+        if (ShouldRefreshToken())
+        {
+            await RefreshAccessTokenAsync();
+        }
     }
 
     public async Task<CustomerResponse> GetCustomer()
@@ -347,14 +383,16 @@ public class TastyTradeClient
         return JsonSerializer.Deserialize<MarketDataResponse>(response);
     }
 
-    
+
 
     private async Task<string> Get(string url)
     {
+        await EnsureTokenFreshAsync();
+
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
-        
+
         // Use Bearer token authentication if OAuth2 is configured; otherwise fall back to session token
         if (!string.IsNullOrWhiteSpace(_accessToken))
         {
@@ -364,18 +402,35 @@ public class TastyTradeClient
         {
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_authenticationResponse.Data.SessionToken);
         }
-        //this silently 401's after teh access token times out
+
         var response = await client.GetAsync(url);
+
+        // Handle 401 Unauthorized - token expired
+        if (response.StatusCode == HttpStatusCode.Unauthorized && !string.IsNullOrWhiteSpace(_accessToken))
+        {
+            await RefreshAccessTokenAsync();
+
+            // Retry the request with the new token
+            using var retryClient = new HttpClient();
+            retryClient.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
+            retryClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
+            retryClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+
+            response = await retryClient.GetAsync(url);
+        }
+
         return await response.Content.ReadAsStringAsync();
     }
 
     private async Task<string> Post(string url, string jsonBody)
     {
+        await EnsureTokenFreshAsync();
+
         var uri = new Uri(url);
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
-        
+
         // Use Bearer token authentication if OAuth2 is configured; otherwise fall back to session token
         if (!string.IsNullOrWhiteSpace(_accessToken))
         {
@@ -390,6 +445,24 @@ public class TastyTradeClient
         content.Headers.ContentType = new MediaTypeHeaderValue(Constants.ContentType);
 
         var response = await client.PostAsync(uri, content);
+
+        // Handle 401 Unauthorized - token expired
+        if (response.StatusCode == HttpStatusCode.Unauthorized && !string.IsNullOrWhiteSpace(_accessToken))
+        {
+            await RefreshAccessTokenAsync();
+
+            // Retry the request with the new token
+            using var retryClient = new HttpClient();
+            retryClient.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
+            retryClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
+            retryClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+
+            using var retryContent = new StringContent(jsonBody);
+            retryContent.Headers.ContentType = new MediaTypeHeaderValue(Constants.ContentType);
+
+            response = await retryClient.PostAsync(uri, retryContent);
+        }
+
         if ((!response.IsSuccessStatusCode) && (response.StatusCode != HttpStatusCode.UnprocessableEntity))
         {
             var errorResponseTextIfAny = await response.Content.ReadAsStringAsync();

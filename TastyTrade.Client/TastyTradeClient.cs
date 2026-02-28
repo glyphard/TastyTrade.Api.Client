@@ -329,20 +329,68 @@ public class TastyTradeClient
         var response = await Get($"{_baseUrl}/accounts/{accountNumber}/positions");
         return JsonSerializer.Deserialize<PositionsResponse>(response);
     }
-    
+
+    // Public Watchlists API
+    public async Task<WatchListsResponse> GetAllPublicWatchLists(bool countsOnly = false)
+    {
+        var url = $"{_baseUrl}/public-watchlists";
+        if (countsOnly)
+            url += "?counts-only=true";
+
+        var response = await Get(url);
+        return JsonSerializer.Deserialize<WatchListsResponse>(response);
+    }
+
     public async Task<WatchListResponse> GetPublicWatchList(string watchlist_name)
     {
         var response = await Get($"{_baseUrl}/public-watchlists/{watchlist_name}");
         return JsonSerializer.Deserialize<WatchListResponse>(response);
     }
 
+    // User Watchlists API
+    public async Task<WatchListsResponse> GetAllUserWatchLists()
+    {
+        var response = await Get($"{_baseUrl}/watchlists");
+        return JsonSerializer.Deserialize<WatchListsResponse>(response);
+    }
+
     public async Task<WatchListResponse> GetUserWatchList(string watchlist_name)
     {
         var response = await Get($"{_baseUrl}/watchlists/{watchlist_name}");
-        if (string.IsNullOrWhiteSpace(response)) {
+        if (string.IsNullOrWhiteSpace(response))
+        {
             return default(WatchListResponse);
         }
         return JsonSerializer.Deserialize<WatchListResponse>(response);
+    }
+
+    public async Task<WatchListResponse> CreateUserWatchList(CreateWatchListRequest request)
+    {
+        return await Post<CreateWatchListRequest, WatchListResponse>($"{_baseUrl}/watchlists", request);
+    }
+
+    public async Task<WatchListResponse> UpdateUserWatchList(string watchlist_name, UpdateWatchListRequest request)
+    {
+        return await Put<UpdateWatchListRequest, WatchListResponse>($"{_baseUrl}/watchlists/{watchlist_name}", request);
+    }
+
+    public async Task<WatchListResponse> DeleteUserWatchList(string watchlist_name)
+    {
+        var response = await Delete($"{_baseUrl}/watchlists/{watchlist_name}");
+        return JsonSerializer.Deserialize<WatchListResponse>(response);
+    }
+
+    // Pairs Watchlists API
+    public async Task<PairsWatchListsResponse> GetAllPairsWatchLists()
+    {
+        var response = await Get($"{_baseUrl}/pairs-watchlists");
+        return JsonSerializer.Deserialize<PairsWatchListsResponse>(response);
+    }
+
+    public async Task<PairsWatchListResponse> GetPairsWatchList(string pairs_watchlist_name)
+    {
+        var response = await Get($"{_baseUrl}/pairs-watchlists/{pairs_watchlist_name}");
+        return JsonSerializer.Deserialize<PairsWatchListResponse>(response);
     }
 
     public async Task<MarketMetricsInfoResponse> GetMarketMetrics(string[] symbols)
@@ -352,8 +400,50 @@ public class TastyTradeClient
         {
             return default(MarketMetricsInfoResponse);
         }
-        return JsonSerializer.Deserialize<MarketMetricsInfoResponse>(response);
+
+        var options = new JsonSerializerOptions
+        {
+            Converters = { new MarketMetricsArrayJsonConverter() }
+        };
+        return JsonSerializer.Deserialize<MarketMetricsInfoResponse>(response, options);
     }
+
+    public async Task<DividendInfoResponse> GetHistoricDividends(string symbol)
+    {
+        var response = await Get($"{_baseUrl}/market-metrics/historic-corporate-events/dividends/{symbol}");
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return default(DividendInfoResponse);
+        }
+
+        var options = new JsonSerializerOptions
+        {
+            Converters = { new DividendInfoArrayJsonConverter() }
+        };
+        return JsonSerializer.Deserialize<DividendInfoResponse>(response, options);
+    }
+
+    public async Task<EarningsInfoResponse> GetHistoricEarnings(string symbol, DateTime startDate, DateTime? endDate = null)
+    {
+        var url = $"{_baseUrl}/market-metrics/historic-corporate-events/earnings-reports/{symbol}?start-date={startDate:yyyy-MM-dd}";
+        if (endDate.HasValue)
+        {
+            url += $"&end-date={endDate.Value:yyyy-MM-dd}";
+        }
+
+        var response = await Get(url);
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return default(EarningsInfoResponse);
+        }
+
+        var options = new JsonSerializerOptions
+        {
+            Converters = { new EarningsInfoArrayJsonConverter() }
+        };
+        return JsonSerializer.Deserialize<EarningsInfoResponse>(response, options);
+    }
+
     public async Task<MarginRequirementsPublicConfigurationResponse> GetMarginRequirementsPublicConfiguration()
     {
         var response = await Get($"{_baseUrl}/margin-requirements-public-configuration");
@@ -476,13 +566,105 @@ public class TastyTradeClient
         where RequestType : new()
         where ResponseType : new() 
     {
-
         var requestBodyJson = JsonSerializer.Serialize(requestBodyObject);
         var responseJson = await Post(url, requestBodyJson);
 
         var responseType = JsonSerializer.Deserialize<ResponseType>(responseJson);
 
         return responseType;
+    }
+
+    private async Task<string> Put(string url, string jsonBody)
+    {
+        await EnsureTokenFreshAsync();
+
+        var uri = new Uri(url);
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
+
+        if (!string.IsNullOrWhiteSpace(_accessToken))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        }
+        else if (_authenticationResponse?.Data?.SessionToken != null)
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_authenticationResponse.Data.SessionToken);
+        }
+
+        using var content = new StringContent(jsonBody);
+        content.Headers.ContentType = new MediaTypeHeaderValue(Constants.ContentType);
+
+        var response = await client.PutAsync(uri, content);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized && !string.IsNullOrWhiteSpace(_accessToken))
+        {
+            await RefreshAccessTokenAsync();
+
+            using var retryClient = new HttpClient();
+            retryClient.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
+            retryClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
+            retryClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+
+            using var retryContent = new StringContent(jsonBody);
+            retryContent.Headers.ContentType = new MediaTypeHeaderValue(Constants.ContentType);
+
+            response = await retryClient.PutAsync(uri, retryContent);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorResponseTextIfAny = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException($"{uri.PathAndQuery} - {response.StatusCode.ToString()}-{response.ReasonPhrase}", new InvalidOperationException(errorResponseTextIfAny));
+        }
+
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    private async Task<ResponseType> Put<RequestType, ResponseType>(string url, RequestType requestBodyObject)
+        where RequestType : new()
+        where ResponseType : new()
+    {
+        var requestBodyJson = JsonSerializer.Serialize(requestBodyObject);
+        var responseJson = await Put(url, requestBodyJson);
+
+        var responseType = JsonSerializer.Deserialize<ResponseType>(responseJson);
+
+        return responseType;
+    }
+
+    private async Task<string> Delete(string url)
+    {
+        await EnsureTokenFreshAsync();
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
+
+        if (!string.IsNullOrWhiteSpace(_accessToken))
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+        }
+        else if (_authenticationResponse?.Data?.SessionToken != null)
+        {
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_authenticationResponse.Data.SessionToken);
+        }
+
+        var response = await client.DeleteAsync(url);
+
+        if (response.StatusCode == HttpStatusCode.Unauthorized && !string.IsNullOrWhiteSpace(_accessToken))
+        {
+            await RefreshAccessTokenAsync();
+
+            using var retryClient = new HttpClient();
+            retryClient.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
+            retryClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
+            retryClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
+
+            response = await retryClient.DeleteAsync(url);
+        }
+
+        return await response.Content.ReadAsStringAsync();
     }
 
 

@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using TastyTrade.Client.Model.Helper;
 
 namespace TastyTrade.Client.Model.Response
 {
-    // Top-level wrapper (keeps consistent shape with other Response classes in the project).
-    // Some endpoints return a plain array; if the endpoint returns a raw array you can deserialize
-    // to List<MarketMetricsInfoItem> directly. This wrapper mirrors other response patterns.
     public class MarketMetricsInfoResponse
     {
         [JsonPropertyName("data")]
@@ -18,6 +16,38 @@ namespace TastyTrade.Client.Model.Response
     {
         [JsonPropertyName("items")]
         public List<MarketMetricsInfoItem> Items { get; set; }
+    }
+
+    public class MarketMetricsArrayJsonConverter : JsonConverter<MarketMetricsInfoResponse>
+    {
+        public override MarketMetricsInfoResponse Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.StartArray)
+            {
+                var items = JsonSerializer.Deserialize<List<MarketMetricsInfoItem>>(ref reader, options);
+                return new MarketMetricsInfoResponse
+                {
+                    Data = new MarketMetricsInfoResponseData { Items = items ?? new List<MarketMetricsInfoItem>() }
+                };
+            }
+            else if (reader.TokenType == JsonTokenType.StartObject)
+            {
+                using var doc = JsonDocument.ParseValue(ref reader);
+                if (doc.RootElement.TryGetProperty("data", out var dataElement))
+                {
+                    return new MarketMetricsInfoResponse
+                    {
+                        Data = JsonSerializer.Deserialize<MarketMetricsInfoResponseData>(dataElement.GetRawText(), options)
+                    };
+                }
+            }
+            return new MarketMetricsInfoResponse { Data = new MarketMetricsInfoResponseData { Items = new List<MarketMetricsInfoItem>() } };
+        }
+
+        public override void Write(Utf8JsonWriter writer, MarketMetricsInfoResponse value, JsonSerializerOptions options)
+        {
+            JsonSerializer.Serialize(writer, value.Data?.Items ?? new List<MarketMetricsInfoItem>(), options);
+        }
     }
 
     public class MarketMetricsInfoItem

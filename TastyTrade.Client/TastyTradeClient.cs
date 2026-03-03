@@ -672,4 +672,72 @@ public class TastyTradeClient
         var orderSubmissionResponse = await Post<PlaceOrderRequest, PlacedOrderResponse> ($"{_baseUrl}/accounts/{accountNumber}/orders", orderSubmission);
         return orderSubmissionResponse;
     }
+
+    public async Task<OrdersResponse> GetOrders(
+        string accountNumber,
+        int pageOffset = 0,
+        int perPage = 50,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        string[] status = null,
+        string underlyingSymbol = null,
+        string sort = "Desc")
+    {
+        var queryParams = new List<string>
+        {
+            $"page-offset={pageOffset}",
+            $"per-page={perPage}",
+            $"sort={sort}"
+        };
+
+        if (startDate.HasValue)
+            queryParams.Add($"start-date={startDate.Value:yyyy-MM-dd}");
+
+        if (endDate.HasValue)
+            queryParams.Add($"end-date={endDate.Value:yyyy-MM-dd}");
+
+        if (status != null && status.Length > 0)
+        {
+            foreach (var s in status)
+                queryParams.Add($"status[]={s}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(underlyingSymbol))
+            queryParams.Add($"underlying-symbol={underlyingSymbol}");
+
+        var query = string.Join("&", queryParams);
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/orders?{query}");
+        return JsonSerializer.Deserialize<OrdersResponse>(response);
+    }
+
+    public async Task<OrdersResponse> GetLiveOrders(
+        string accountNumber,
+        int pageOffset = 0,
+        int perPage = 50)
+    {
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/orders/live?page-offset={pageOffset}&per-page={perPage}");
+        return JsonSerializer.Deserialize<OrdersResponse>(response);
+    }
+
+    public async Task<OrderResponse> GetOrder(string accountNumber, long orderId)
+    {
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}");
+        return JsonSerializer.Deserialize<OrderResponse>(response);
+    }
+
+    public async Task<OrderResponse> CancelOrder(string accountNumber, long orderId)
+    {
+        var response = await Delete($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}");
+        return JsonSerializer.Deserialize<OrderResponse>(response);
+    }
+
+    public async Task<OrderResponse> ReplaceOrder(string accountNumber, long orderId, PlaceOrderRequest newOrder)
+    {
+        return await Put<PlaceOrderRequest, OrderResponse>($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}", newOrder);
+    }
+
+    public async Task<PlacedOrderResponse> DryRunOrder(string accountNumber, PlaceOrderRequest orderRequest)
+    {
+        return await Post<PlaceOrderRequest, PlacedOrderResponse>($"{_baseUrl}/accounts/{accountNumber}/orders/dry-run", orderRequest);
+    }
 }

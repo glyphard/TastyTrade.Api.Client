@@ -17,11 +17,11 @@ static class Program
         SystemProperty.SetProperty("dxfeed.experimental.dxlink.enable", "true");
         SystemProperty.SetProperty("scheme", "ext:opt:sysprops,resource:dxlink.xml");
 
-        var credentials = JsonSerializer.Deserialize<AuthorizationCredentials>(await File.ReadAllTextAsync(Constants.CredsPath));
+        var credentials = JsonSerializer.Deserialize<TastyOAuthCredentials>(await File.ReadAllTextAsync(Constants.CredsPath));
         
         await FuturesStreamer.Run(credentials, Constants.TestFuturesSymbol);
         var optionChainStream = await OptionChainStreamer.BeingStreamingOptionChain(credentials, Constants.TestOptionUnderlyingSymbol, DateTime.Now, TimeSpan.FromDays(185));
-        var accountUpdate = await AccountStreamer.BeginStreamingAccounts(credentials);
+        var accountUpdate = await AccountStreamer.BeginStreamingAccounts(credentials, Constants.TestAccountNumber);
         //await OrderSubmitter.Run(credentials, GetTestOrderSubmission());  //places an actual order
 
         //await Task.Delay(Timeout.Infinite);

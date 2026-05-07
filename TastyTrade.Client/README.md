@@ -2,7 +2,7 @@
 
 A C# client library for the Tasty Trade API
 
-For updates and issues refer to https://github.com/veritacodex/TastyTrade.Api.Client
+For updates and issues refer to https://github.com/glyphard/TastyTrade.Api.Client
 
 ## Authentication
 
@@ -30,7 +30,8 @@ var credentials = new TastyOAuthCredentials
     ClientSecret = "your-client-secret",
     RefreshToken = "your-refresh-token",
     UserAgent = "YourApp/1.0",
-    ApiBaseUrl = "https://api.tastyworks.com"  // or "https://api.cert.tastyworks.com" for certification
+    ApiBaseUrl = "https://api.tastyworks.com",           // or "https://api.cert.tastyworks.com" for certification
+    StreamingApiBaseUrl = "wss://streamer.tastyworks.com" // used for account/order streaming
 };
 
 // Authenticate with default token refresh interval

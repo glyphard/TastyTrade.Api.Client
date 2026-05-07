@@ -5,9 +5,17 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>TastyTrade.Api.Client</PackageId>
     <PackageVersion>1.0.4</PackageVersion>
+    <Authors>glyphard</Authors>
+    <Description>A C# client library for the TastyTrade API, supporting authentication, account management, order placement, streaming, and more.</Description>
+    <PackageTags>tastytrade;trading;api;client;options;stocks</PackageTags>
+    <PackageProjectUrl>https://github.com/glyphard/TastyTrade.Api.Client</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/glyphard/TastyTrade.Api.Client</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>

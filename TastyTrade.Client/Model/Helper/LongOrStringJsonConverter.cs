@@ -5,8 +5,14 @@ using System.Text.Json.Serialization;
 
 namespace TastyTrade.Client.Model.Helper
 {
+    /// <summary>
+    /// Represents the long or string json converter.
+    /// </summary>
     public sealed class LongOrStringJsonConverter : JsonConverter<long>
     {
+        /// <summary>
+        /// Executes the read operation.
+        /// </summary>
         public override long Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType == JsonTokenType.Number)
@@ -40,6 +46,9 @@ namespace TastyTrade.Client.Model.Helper
             throw new JsonException($"Unexpected token parsing Int64. Token: {reader.TokenType}");
         }
 
+        /// <summary>
+        /// Executes the write operation.
+        /// </summary>
         public override void Write(Utf8JsonWriter writer, long value, JsonSerializerOptions options)
         {
             writer.WriteNumberValue(value);

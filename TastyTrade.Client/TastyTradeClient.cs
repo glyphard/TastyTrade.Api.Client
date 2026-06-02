@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -14,6 +14,9 @@ using TastyTrade.Client.Model.Response;
 
 namespace TastyTrade.Client;
 
+/// <summary>
+/// Represents the tasty trade client.
+/// </summary>
 public class TastyTradeClient
 {
     private AuthenticationResponse _authenticationResponse;
@@ -28,6 +31,9 @@ public class TastyTradeClient
     private TimeSpan _refreshTokenLifetimeMax;
     private readonly SemaphoreSlim _refreshLock = new SemaphoreSlim(1, 1);
 
+    /// <summary>
+    /// Gets authentication response.
+    /// </summary>
     public AuthenticationResponse GetAuthenticationResponse() { return _authenticationResponse; }
 
     /// <summary>
@@ -53,6 +59,9 @@ public class TastyTradeClient
         _accessToken = await GetAccessTokenAsync();
         _tokenLastRefreshed = DateTime.UtcNow;
     }
+    /// <summary>
+    /// Executes the authenticate operation.
+    /// </summary>
     public async Task Authenticate(TastyOAuthCredentials credentials, TimeSpan? refreshTokenLifetimeMax = null)
     {
         await AuthenticateOAuth(credentials, refreshTokenLifetimeMax);
@@ -157,72 +166,114 @@ public class TastyTradeClient
         }
     }
 
+    /// <summary>
+    /// Gets customer.
+    /// </summary>
     public async Task<CustomerResponse> GetCustomer()
     {
         var response = await Get($"{_baseUrl}/customers/me");
         return JsonSerializer.Deserialize<CustomerResponse>(response);
     }
+    /// <summary>
+    /// Gets api quote tokens.
+    /// </summary>
     public async Task<ApiQuoteTokenResponse> GetApiQuoteTokens()
     {
         var response = await Get($"{_baseUrl}/api-quote-tokens");
         return JsonSerializer.Deserialize<ApiQuoteTokenResponse>(response);
     }
+    /// <summary>
+    /// Gets accounts.
+    /// </summary>
     public async Task<AccountsResponse> GetAccounts()
     {
         var response = await Get($"{_baseUrl}/customers/me/accounts");
         return JsonSerializer.Deserialize<AccountsResponse>(response);
     }
+    /// <summary>
+    /// Gets account.
+    /// </summary>
     public async Task<AccountResponse> GetAccount(string accountNumber)
     {
         var response = await Get($"{_baseUrl}/customers/me/accounts/{accountNumber}");
         return JsonSerializer.Deserialize<AccountResponse>(response);
     }
+    /// <summary>
+    /// Gets account status.
+    /// </summary>
     public async Task<TradingStatusResponse> GetAccountStatus(string accountNumber)
     {
         var response = await Get($"{_baseUrl}/accounts/{accountNumber}/trading-status");
         return JsonSerializer.Deserialize<TradingStatusResponse>(response);
     }
+    /// <summary>
+    /// Gets account balance.
+    /// </summary>
     public async Task<AccountBalanceResponse> GetAccountBalance(string accountNumber)
     {
         var response = await Get($"{_baseUrl}/accounts/{accountNumber}/balances");
         return JsonSerializer.Deserialize<AccountBalanceResponse>(response);
     }
+    /// <summary>
+    /// Gets account balance.
+    /// </summary>
     public async Task<AccountBalanceResponse> GetAccountBalance(string accountNumber, string currency)
     {
         var response = await Get($"{_baseUrl}/accounts/{accountNumber}/balances/{currency}");
         return JsonSerializer.Deserialize<AccountBalanceResponse>(response);
     }
+    /// <summary>
+    /// Gets account balance snapshot.
+    /// </summary>
     public async Task<AccountBalanceResponse> GetAccountBalanceSnapshot(string accountNumber)
     {
         var response = await Get($"{_baseUrl}/accounts/{accountNumber}/balance-snapshots");
         return JsonSerializer.Deserialize<AccountBalanceResponse>(response);
     }
+    /// <summary>
+    /// Gets all futures.
+    /// </summary>
     public async Task<FutureContractsResponse> GetAllFutures()
     {
         var response = await Get($"{_baseUrl}/instruments/futures");
         return JsonSerializer.Deserialize<FutureContractsResponse>(response);
     }
+    /// <summary>
+    /// Gets all future option products.
+    /// </summary>
     public async Task<FutureOptionProductsResponse> GetAllFutureOptionProducts()
     {
         var response = await Get($"{_baseUrl}/instruments/future-option-products");
         return JsonSerializer.Deserialize<FutureOptionProductsResponse>(response);
     }
+    /// <summary>
+    /// Gets future option product.
+    /// </summary>
     public async Task<FutureOptionProductResponse> GetFutureOptionProduct(string exchange, string symbol)
     {
         var response = await Get($"{_baseUrl}/instruments/future-option-products/{exchange}/{symbol}");
         return JsonSerializer.Deserialize<FutureOptionProductResponse>(response);
     }
+    /// <summary>
+    /// Gets futures contract.
+    /// </summary>
     public async Task<FutureContractResponse> GetFuturesContract(string symbol)
     {
         var response = await Get($"{_baseUrl}/instruments/futures/{symbol}");
         return JsonSerializer.Deserialize<FutureContractResponse>(response);
     }
+    /// <summary>
+    /// Executes the search operation.
+    /// </summary>
     public async Task<SearchResponse> Search(string symbol)
     {
         //this method seemed to be unavalaible at the time I added it.
         var response = await Get($"{_baseUrl}/symbols/search/{symbol}");
         return JsonSerializer.Deserialize<SearchResponse>(response);
     }
+    /// <summary>
+    /// Gets option chains.
+    /// </summary>
     public async Task<OptionChainResponse> GetOptionChains(string symbol)
     {
         var response = await Get($"{_baseUrl}/option-chains/{symbol}");
@@ -230,6 +281,9 @@ public class TastyTradeClient
         chain.Data.Items = [.. chain.Data.Items.Where(x => x.Active).OrderBy(x => x.StrikePrice)];
         return chain;
     }
+    /// <summary>
+    /// Gets future option chains.
+    /// </summary>
     public async Task<OptionChainResponse> GetFutureOptionChains(string symbol)
     {
         var response = await Get($"{_baseUrl}/futures-option-chains/{symbol}");
@@ -239,6 +293,9 @@ public class TastyTradeClient
     }
 
     // Decorator method: keeps original simple call but delegates to the overload that supports date range + pagination.
+    /// <summary>
+    /// Gets transactions.
+    /// </summary>
     public async Task<TransactionsResponse> GetTransactions(string accountNumber)
     {
         var sinceWhen = DateTime.UtcNow.AddMonths(-12);
@@ -247,6 +304,9 @@ public class TastyTradeClient
     }
 
     // Implementation: fetches all pages using pagination (top-level "pagination" object) and aggregates items.
+    /// <summary>
+    /// Gets transactions.
+    /// </summary>
     public async Task<TransactionsResponse> GetTransactions(string accountNumber, DateTime startDate, DateTime endDate)
     {
         if (string.IsNullOrWhiteSpace(accountNumber)) throw new ArgumentException("accountNumber is required", nameof(accountNumber));
@@ -317,6 +377,9 @@ public class TastyTradeClient
 
 
 
+    /// <summary>
+    /// Gets equity.
+    /// </summary>
     public async Task<EquityResponse> GetEquity(string symbol)
     {
         var response = await Get($"{_baseUrl}/instruments/equities/{symbol}");
@@ -324,6 +387,9 @@ public class TastyTradeClient
     }
 
     // New: retrieve positions for an account
+    /// <summary>
+    /// Gets positions.
+    /// </summary>
     public async Task<PositionsResponse> GetPositions(string accountNumber)
     {
         var response = await Get($"{_baseUrl}/accounts/{accountNumber}/positions");
@@ -331,6 +397,9 @@ public class TastyTradeClient
     }
 
     // Public Watchlists API
+    /// <summary>
+    /// Gets all public watch lists.
+    /// </summary>
     public async Task<WatchListsResponse> GetAllPublicWatchLists(bool countsOnly = false)
     {
         var url = $"{_baseUrl}/public-watchlists";
@@ -341,6 +410,9 @@ public class TastyTradeClient
         return JsonSerializer.Deserialize<WatchListsResponse>(response);
     }
 
+    /// <summary>
+    /// Gets public watch list.
+    /// </summary>
     public async Task<WatchListResponse> GetPublicWatchList(string watchlist_name)
     {
         var response = await Get($"{_baseUrl}/public-watchlists/{watchlist_name}");
@@ -348,12 +420,18 @@ public class TastyTradeClient
     }
 
     // User Watchlists API
+    /// <summary>
+    /// Gets all user watch lists.
+    /// </summary>
     public async Task<WatchListsResponse> GetAllUserWatchLists()
     {
         var response = await Get($"{_baseUrl}/watchlists");
         return JsonSerializer.Deserialize<WatchListsResponse>(response);
     }
 
+    /// <summary>
+    /// Gets user watch list.
+    /// </summary>
     public async Task<WatchListResponse> GetUserWatchList(string watchlist_name)
     {
         var response = await Get($"{_baseUrl}/watchlists/{watchlist_name}");
@@ -364,16 +442,25 @@ public class TastyTradeClient
         return JsonSerializer.Deserialize<WatchListResponse>(response);
     }
 
+    /// <summary>
+    /// Executes the create user watch list operation.
+    /// </summary>
     public async Task<WatchListResponse> CreateUserWatchList(CreateWatchListRequest request)
     {
         return await Post<CreateWatchListRequest, WatchListResponse>($"{_baseUrl}/watchlists", request);
     }
 
+    /// <summary>
+    /// Executes the update user watch list operation.
+    /// </summary>
     public async Task<WatchListResponse> UpdateUserWatchList(string watchlist_name, UpdateWatchListRequest request)
     {
         return await Put<UpdateWatchListRequest, WatchListResponse>($"{_baseUrl}/watchlists/{watchlist_name}", request);
     }
 
+    /// <summary>
+    /// Executes the delete user watch list operation.
+    /// </summary>
     public async Task<WatchListResponse> DeleteUserWatchList(string watchlist_name)
     {
         var response = await Delete($"{_baseUrl}/watchlists/{watchlist_name}");
@@ -381,18 +468,27 @@ public class TastyTradeClient
     }
 
     // Pairs Watchlists API
+    /// <summary>
+    /// Gets all pairs watch lists.
+    /// </summary>
     public async Task<PairsWatchListsResponse> GetAllPairsWatchLists()
     {
         var response = await Get($"{_baseUrl}/pairs-watchlists");
         return JsonSerializer.Deserialize<PairsWatchListsResponse>(response);
     }
 
+    /// <summary>
+    /// Gets pairs watch list.
+    /// </summary>
     public async Task<PairsWatchListResponse> GetPairsWatchList(string pairs_watchlist_name)
     {
         var response = await Get($"{_baseUrl}/pairs-watchlists/{pairs_watchlist_name}");
         return JsonSerializer.Deserialize<PairsWatchListResponse>(response);
     }
 
+    /// <summary>
+    /// Gets market metrics.
+    /// </summary>
     public async Task<MarketMetricsInfoResponse> GetMarketMetrics(string[] symbols)
     {
         var response = await Get($"{_baseUrl}/market-metrics?symbols={string.Join(',', symbols)}");
@@ -408,6 +504,9 @@ public class TastyTradeClient
         return JsonSerializer.Deserialize<MarketMetricsInfoResponse>(response, options);
     }
 
+    /// <summary>
+    /// Gets historic dividends.
+    /// </summary>
     public async Task<DividendInfoResponse> GetHistoricDividends(string symbol)
     {
         var response = await Get($"{_baseUrl}/market-metrics/historic-corporate-events/dividends/{symbol}");
@@ -423,6 +522,9 @@ public class TastyTradeClient
         return JsonSerializer.Deserialize<DividendInfoResponse>(response, options);
     }
 
+    /// <summary>
+    /// Gets historic earnings.
+    /// </summary>
     public async Task<EarningsInfoResponse> GetHistoricEarnings(string symbol, DateTime startDate, DateTime? endDate = null)
     {
         var url = $"{_baseUrl}/market-metrics/historic-corporate-events/earnings-reports/{symbol}?start-date={startDate:yyyy-MM-dd}";
@@ -444,6 +546,9 @@ public class TastyTradeClient
         return JsonSerializer.Deserialize<EarningsInfoResponse>(response, options);
     }
 
+    /// <summary>
+    /// Gets margin requirements public configuration.
+    /// </summary>
     public async Task<MarginRequirementsPublicConfigurationResponse> GetMarginRequirementsPublicConfiguration()
     {
         var response = await Get($"{_baseUrl}/margin-requirements-public-configuration");
@@ -454,6 +559,9 @@ public class TastyTradeClient
         return JsonSerializer.Deserialize<MarginRequirementsPublicConfigurationResponse>(response);
     }
 
+    /// <summary>
+    /// Gets market data.
+    /// </summary>
     public async Task<MarketDataResponse> GetMarketData(string[] index, string[] equity, string[] equityOption, string[] future, string[] futureOption, string[] cryptocurrency)
     {
         var indexParam = index?.Length > 0 ? string.Join(',', index) : string.Empty;
@@ -668,11 +776,17 @@ public class TastyTradeClient
     }
 
 
+    /// <summary>
+    /// Executes the post order submission operation.
+    /// </summary>
     public async Task<PlacedOrderResponse> PostOrderSubmission(string accountNumber, PlaceOrderRequest orderSubmission) {
         var orderSubmissionResponse = await Post<PlaceOrderRequest, PlacedOrderResponse> ($"{_baseUrl}/accounts/{accountNumber}/orders", orderSubmission);
         return orderSubmissionResponse;
     }
 
+    /// <summary>
+    /// Gets orders.
+    /// </summary>
     public async Task<OrdersResponse> GetOrders(
         string accountNumber,
         int pageOffset = 0,
@@ -710,6 +824,9 @@ public class TastyTradeClient
         return JsonSerializer.Deserialize<OrdersResponse>(response);
     }
 
+    /// <summary>
+    /// Gets live orders.
+    /// </summary>
     public async Task<OrdersResponse> GetLiveOrders(
         string accountNumber,
         int pageOffset = 0,
@@ -719,23 +836,35 @@ public class TastyTradeClient
         return JsonSerializer.Deserialize<OrdersResponse>(response);
     }
 
+    /// <summary>
+    /// Gets order.
+    /// </summary>
     public async Task<OrderResponse> GetOrder(string accountNumber, long orderId)
     {
         var response = await Get($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}");
         return JsonSerializer.Deserialize<OrderResponse>(response);
     }
 
+    /// <summary>
+    /// Executes the cancel order operation.
+    /// </summary>
     public async Task<OrderResponse> CancelOrder(string accountNumber, long orderId)
     {
         var response = await Delete($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}");
         return JsonSerializer.Deserialize<OrderResponse>(response);
     }
 
+    /// <summary>
+    /// Executes the replace order operation.
+    /// </summary>
     public async Task<OrderResponse> ReplaceOrder(string accountNumber, long orderId, PlaceOrderRequest newOrder)
     {
         return await Put<PlaceOrderRequest, OrderResponse>($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}", newOrder);
     }
 
+    /// <summary>
+    /// Executes the dry run order operation.
+    /// </summary>
     public async Task<PlacedOrderResponse> DryRunOrder(string accountNumber, PlaceOrderRequest orderRequest)
     {
         return await Post<PlaceOrderRequest, PlacedOrderResponse>($"{_baseUrl}/accounts/{accountNumber}/orders/dry-run", orderRequest);

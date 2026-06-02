@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -8,11 +8,11 @@ using System.Threading.Tasks;
 
 namespace TastyTrade.Client.Model.Request
 {
+    /// <summary>
+    /// Represents the tasty o auth credentials.
+    /// </summary>
     public class TastyOAuthCredentials
     {
-        /// <summary>
-        /// Stores OAuth2 credentials for TastyTrade API authentication
-        /// </summary>
         //public class OAuthCredentials
         //{
             /// <summary>

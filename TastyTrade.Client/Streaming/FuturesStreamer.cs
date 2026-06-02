@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using DxFeed.Graal.Net.Api;
 using DxFeed.Graal.Net.Events.Market;
@@ -6,8 +6,14 @@ using TastyTrade.Client.Model.Request;
 
 namespace TastyTrade.Client.Streaming;
 
+/// <summary>
+/// Provides futures streamer functionality.
+/// </summary>
 public static class FuturesStreamer
 {
+    /// <summary>
+    /// Executes the run operation.
+    /// </summary>
     public static async Task Run( TastyOAuthCredentials credentials, string futureSymbol)
     {
         var tastyTradeClient = new TastyTradeClient();

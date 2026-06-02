@@ -247,6 +247,7 @@ public class OptionChainItemSide
     public decimal Bid { get; set; }
     public decimal Ask { get; set; }
     public decimal Delta { get; set; }
+    public decimal Gamma { get; set; }
     public decimal Theta { get; set; }
     public decimal Vega { get; set; }
     public decimal? ImpliedVolatility { get; set; }

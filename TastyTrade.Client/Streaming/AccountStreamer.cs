@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
@@ -16,6 +16,9 @@ using TastyTrade.Client.Utils;
 
 namespace TastyTrade.Client.Streaming
 {
+    /// <summary>
+    /// Provides account streamer functionality.
+    /// </summary>
     public static class AccountStreamer
     {
         private static long _heartbeatIntervalMillis = 6000L;
@@ -27,6 +30,9 @@ namespace TastyTrade.Client.Streaming
         private static readonly Dictionary<StreamingAccountUpdateType, string> _accountUpdateTypeStringMap = new Dictionary<StreamingAccountUpdateType, string>();
         private static readonly Dictionary<string, string> _accountUpdateKeySerializationPropertyNameMap = new Dictionary<string, string>();
 
+        /// <summary>
+        /// Executes the setup serialization attribute string maps operation.
+        /// </summary>
         public static void SetupSerializationAttributeStringMaps()
         {
             var actionTypeEnumType = typeof(SubscriptionActionType);
@@ -75,11 +81,17 @@ namespace TastyTrade.Client.Streaming
             _accountUpdateKeySerializationPropertyNameMap.Add(_SubscriptionActionMessageResponse_Action, actionMessageActionTypeSerializationValue);
         }
 
+        /// <summary>
+        /// Executes the run operation.
+        /// </summary>
         public static async Task Run(TastyOAuthCredentials credentials, string accountNumber)
         {
             var accountUpdate = await BeginStreamingAccounts(credentials, accountNumber);
         }
 
+        /// <summary>
+        /// Executes the begin streaming accounts operation.
+        /// </summary>
         public static async Task<AccountDataUpdates> BeginStreamingAccounts(TastyOAuthCredentials credentials, string accountNumber)
         {
             // Prepare and authenticate

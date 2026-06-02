@@ -7,18 +7,30 @@ using TastyTrade.Client.Model.Request;
 
 namespace TastyTrade.Client.Streaming;
 
+/// <summary>
+/// Provides option chain streamer functionality.
+/// </summary>
 public static class OptionChainStreamer
 {
     
+    /// <summary>
+    /// Executes the run operation.
+    /// </summary>
     public static async Task Run(TastyOAuthCredentials credentials, string symbol, DateTime onOrAfter)
     {
         var optChain = await BeingStreamingOptionChain(credentials, symbol, onOrAfter, TimeSpan.Zero);
     }
     
+    /// <summary>
+    /// Executes the being streaming option chain operation.
+    /// </summary>
     public static async Task<OptionChain> BeingStreamingOptionChain(TastyOAuthCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until)
     {
         return await BeingStreamingOptionChain(credentials, symbol, onOrAfter, until, new NoOpGreeksProvider());
     }
+    /// <summary>
+    /// Executes the being streaming option chain operation.
+    /// </summary>
     public static async Task<OptionChain> BeingStreamingOptionChain(TastyOAuthCredentials credentials, string symbol, DateTime onOrAfter, TimeSpan until, IOptionGreekProvider greeksProvider)
     {
         var tastyTradeClient = new TastyTradeClient();
@@ -117,8 +129,14 @@ public static class OptionChainStreamer
     }
 }
 
+/// <summary>
+/// Represents the no op greeks provider.
+/// </summary>
 public class NoOpGreeksProvider : IOptionGreekProvider
 {
+    /// <summary>
+    /// Gets greeks.
+    /// </summary>
     public Greeks GetGreeks(OptionType optionType, decimal underlyingPrice, decimal optionMarketPrice, decimal strike, decimal timeToExpiryCalendarDays, decimal interestRates, decimal dividends)
     {
         return new Greeks() { Delta = decimal.Zero, Theta = decimal.Zero, Vega = decimal.Zero, ImpliedVolatility = decimal.Zero };

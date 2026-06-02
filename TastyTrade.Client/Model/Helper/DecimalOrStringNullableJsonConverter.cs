@@ -5,8 +5,14 @@ using System.Text.Json.Serialization;
 
 namespace TastyTrade.Client.Model.Helper
 {
+    /// <summary>
+    /// Represents the decimal or string nullable json converter.
+    /// </summary>
     public sealed class DecimalOrStringNullableJsonConverter : JsonConverter<decimal?>
     {
+        /// <summary>
+        /// Executes the read operation.
+        /// </summary>
         public override decimal? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType == JsonTokenType.Number)
@@ -41,6 +47,9 @@ namespace TastyTrade.Client.Model.Helper
             throw new JsonException($"Unexpected token parsing nullable decimal. Token: {reader.TokenType}");
         }
 
+        /// <summary>
+        /// Executes the write operation.
+        /// </summary>
         public override void Write(Utf8JsonWriter writer, decimal? value, JsonSerializerOptions options)
         {
             if (value.HasValue)

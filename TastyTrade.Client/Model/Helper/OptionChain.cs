@@ -8,16 +8,37 @@ using TastyTrade.Client.Model.Response;
 
 namespace TastyTrade.Client.Model.Helper;
 
+/// <summary>
+/// Represents the option chain.
+/// </summary>
 public class OptionChain
 {
+    /// <summary>
+    /// Gets or sets the updated on.
+    /// </summary>
     public string UpdatedOn { get; internal set; }
+    /// <summary>
+    /// Gets or sets the expirations.
+    /// </summary>
     public List<OptionChainExpiration> Expirations { get; internal set; }
+    /// <summary>
+    /// Gets or sets the all expirations.
+    /// </summary>
     public List<OptionChainExpiration> AllExpirations { get; set; }
+    /// <summary>
+    /// Gets or sets the underlying.
+    /// </summary>
     public OptionChainUnderlying Underlying { get; internal set; }
+    /// <summary>
+    /// Gets or sets the previous underlying.
+    /// </summary>
     public OptionChainUnderlying PreviousUnderlying { get; internal set; }
     private IOptionGreekProvider _greekProvider;
 
     // Parameterless ctor: ensures consumers always receive an OptionChain with empty collections (no nulls)
+    /// <summary>
+    /// Executes the option chain operation.
+    /// </summary>
     public OptionChain()
     {
         _greekProvider = new DefaultGreekProvider();
@@ -27,6 +48,9 @@ public class OptionChain
         PreviousUnderlying = new OptionChainUnderlying();
     }
 
+    /// <summary>
+    /// Executes the option chain operation.
+    /// </summary>
     public OptionChain(EquityResponse underlying, OptionChainResponse response, IOptionGreekProvider greeksProvider)
     {
         _greekProvider = greeksProvider ?? new DefaultGreekProvider();
@@ -45,6 +69,9 @@ public class OptionChain
         SetExpirations(response);
     }
 
+    /// <summary>
+    /// Executes the option chain operation.
+    /// </summary>
     public OptionChain(FutureContractResponse underlying, OptionChainResponse response)
     {
         _greekProvider = new DefaultGreekProvider();
@@ -80,7 +107,7 @@ public class OptionChain
             var strikes = item.GroupBy(x => x.StrikePrice).OrderBy(x => x.Key);
             foreach (var strike in strikes)
             {
-                // Ensure both call and put exist for the strike — guard First(...) calls
+                // Ensure both call and put exist for the strike Â— guard First(...) calls
                 var callEntry = strike.FirstOrDefault(x => x.OptionType == "C");
                 var putEntry = strike.FirstOrDefault(x => x.OptionType == "P");
 
@@ -113,9 +140,15 @@ public class OptionChain
         }
     }
 
+    /// <summary>
+    /// Executes the select next expiration operation.
+    /// </summary>
     public void SelectNextExpiration(DateTime onOrAfter) {
         SelectNextExpiration(onOrAfter, TimeSpan.Zero);
     }
+    /// <summary>
+    /// Executes the select next expiration operation.
+    /// </summary>
     public void SelectNextExpiration(DateTime onOrAfter, TimeSpan until)
     {
         if (AllExpirations == null || AllExpirations.Count == 0)
@@ -148,6 +181,9 @@ public class OptionChain
         return next == default ? onOrAfter : next;
     }
 
+    /// <summary>
+    /// Executes the update quote operation.
+    /// </summary>
     public void UpdateQuote(Quote quote)
     {
         UpdatedOn = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
@@ -206,6 +242,9 @@ public class OptionChain
     // default no-op provider so OptionChain is safe to use even if no provider was supplied
     private class DefaultGreekProvider : IOptionGreekProvider
     {
+        /// <summary>
+        /// Gets greeks.
+        /// </summary>
         public Greeks GetGreeks(OptionType optionType, decimal underlyingPrice, decimal optionMarketPrice, decimal strike, decimal timeToExpiryCalendarDays, decimal interestRates, decimal dividends)
         {
             return new Greeks() { Delta = decimal.Zero, Theta = decimal.Zero, Vega = decimal.Zero, ImpliedVolatility = decimal.Zero };
@@ -213,18 +252,45 @@ public class OptionChain
     }
 }
 
+/// <summary>
+/// Represents the option chain underlying.
+/// </summary>
 public class OptionChainUnderlying
 {
+    /// <summary>
+    /// Gets or sets the streamer symbol.
+    /// </summary>
     public string StreamerSymbol { get; internal set; }
+    /// <summary>
+    /// Gets or sets the symbol.
+    /// </summary>
     public string Symbol { get; internal set; }
+    /// <summary>
+    /// Gets or sets the bid.
+    /// </summary>
     public double Bid { get; set; }
+    /// <summary>
+    /// Gets or sets the ask.
+    /// </summary>
     public double Ask { get; set; }
 }
 
+/// <summary>
+/// Represents the option chain expiration.
+/// </summary>
 public class OptionChainExpiration
 {
+    /// <summary>
+    /// Gets or sets the expiration date.
+    /// </summary>
     public string ExpirationDate { get; set; }
+    /// <summary>
+    /// Gets or sets the items.
+    /// </summary>
     public List<OptionChainExpirationItem> Items { get; set; }
+    /// <summary>
+    /// Executes the expiration date to date time operation.
+    /// </summary>
     public DateTime ExpirationDateToDateTime()
     {
         var expirationDtm = DateTime.ParseExact(this.ExpirationDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -232,23 +298,68 @@ public class OptionChainExpiration
     }
 }
 
+/// <summary>
+/// Represents the option chain expiration item.
+/// </summary>
 public class OptionChainExpirationItem
 {
+    /// <summary>
+    /// Gets or sets the strike.
+    /// </summary>
     public decimal Strike { get; set; }
+    /// <summary>
+    /// Gets or sets the call.
+    /// </summary>
     public OptionChainItemSide Call { get; set; }
+    /// <summary>
+    /// Gets or sets the put.
+    /// </summary>
     public OptionChainItemSide Put { get; set; }
+    /// <summary>
+    /// Gets or sets the is at the money.
+    /// </summary>
     public bool IsAtTheMoney { get; set; }
 }
 
+/// <summary>
+/// Represents the option chain item side.
+/// </summary>
 public class OptionChainItemSide
 {
+    /// <summary>
+    /// Gets or sets the streamer symbol.
+    /// </summary>
     public string StreamerSymbol { get; set; }
+    /// <summary>
+    /// Gets or sets the option symbol.
+    /// </summary>
     public string OptionSymbol { get; set; }
+    /// <summary>
+    /// Gets or sets the bid.
+    /// </summary>
     public decimal Bid { get; set; }
+    /// <summary>
+    /// Gets or sets the ask.
+    /// </summary>
     public decimal Ask { get; set; }
+    /// <summary>
+    /// Gets or sets the delta.
+    /// </summary>
     public decimal Delta { get; set; }
+    /// <summary>
+    /// Gets or sets the gamma.
+    /// </summary>
     public decimal Gamma { get; set; }
+    /// <summary>
+    /// Gets or sets the theta.
+    /// </summary>
     public decimal Theta { get; set; }
+    /// <summary>
+    /// Gets or sets the vega.
+    /// </summary>
     public decimal Vega { get; set; }
+    /// <summary>
+    /// Gets or sets the implied volatility.
+    /// </summary>
     public decimal? ImpliedVolatility { get; set; }
 }

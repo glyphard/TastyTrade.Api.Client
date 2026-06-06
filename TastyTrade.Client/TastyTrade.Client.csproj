@@ -6,7 +6,7 @@
 
   <PropertyGroup>
     <PackageId>TastyTrade.Api.Client</PackageId>
-    <PackageVersion>1.0.6</PackageVersion>
+    <PackageVersion>1.0.7</PackageVersion>
     <Authors>glyphard</Authors>
     <Description>A C# client library for the TastyTrade API, supporting authentication, account management, order placement, streaming, and more.</Description>
     <PackageTags>tastytrade;trading;api;client;options;stocks</PackageTags>

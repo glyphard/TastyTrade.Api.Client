@@ -58,6 +58,38 @@ You can also manually refresh the token if needed:
 await client.RefreshAccessTokenAsync();
 ```
 
+## Cancellation
+
+Every facade method that performs network I/O accepts an optional trailing
+`CancellationToken cancellationToken = default` parameter. The token is forwarded to the
+underlying HTTP call **and** to every facade-internal `await` — the automatic 401-retry,
+the `GetTransactions` pagination loop, and the OAuth token-refresh path — so a cancelled
+token tears the whole operation down rather than leaving an orphaned request running in the
+background.
+
+```csharp
+using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+try
+{
+    var marketData = await client.GetMarketData(
+        index: null,
+        equity: new[] { "AAPL", "MSFT" },
+        equityOption: null,
+        future: null,
+        futureOption: null,
+        cryptocurrency: null,
+        cancellationToken: cts.Token);
+}
+catch (OperationCanceledException)
+{
+    // The 10-second deadline elapsed (or the token was cancelled) before the call completed.
+}
+```
+
+Existing callers that omit the argument are unaffected — the parameter defaults to
+`CancellationToken.None`.
+
 ## Usage Examples
 
 ### Get Customer Information

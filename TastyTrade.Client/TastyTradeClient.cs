@@ -42,7 +42,8 @@ public class TastyTradeClient
     /// </summary>
     /// <param name="credentials">Authorization credentials containing OAuth2 parameters</param>
     /// <param name="refreshTokenLifetimeMax">Maximum time before proactively refreshing the token (default 17 minutes)</param>
-    public async Task AuthenticateOAuth(TastyOAuthCredentials credentials, TimeSpan? refreshTokenLifetimeMax = null)
+    /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+    public async Task AuthenticateOAuth(TastyOAuthCredentials credentials, TimeSpan? refreshTokenLifetimeMax = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(credentials.ClientId)) throw new ArgumentException("clientId is required", nameof(credentials.ClientId));
         if (string.IsNullOrWhiteSpace(credentials.ClientSecret)) throw new ArgumentException("clientSecret is required", nameof(credentials.ClientSecret));
@@ -56,21 +57,21 @@ public class TastyTradeClient
         _refreshTokenLifetimeMax = refreshTokenLifetimeMax ?? TimeSpan.FromMinutes(17);
 
         // Obtain access token via OAuth2
-        _accessToken = await GetAccessTokenAsync();
+        _accessToken = await GetAccessTokenAsync(cancellationToken);
         _tokenLastRefreshed = DateTime.UtcNow;
     }
     /// <summary>
     /// Executes the authenticate operation.
     /// </summary>
-    public async Task Authenticate(TastyOAuthCredentials credentials, TimeSpan? refreshTokenLifetimeMax = null)
+    public async Task Authenticate(TastyOAuthCredentials credentials, TimeSpan? refreshTokenLifetimeMax = null, CancellationToken cancellationToken = default)
     {
-        await AuthenticateOAuth(credentials, refreshTokenLifetimeMax);
+        await AuthenticateOAuth(credentials, refreshTokenLifetimeMax, cancellationToken);
     }
         /// <summary>
         /// Legacy session-based authentication (deprecated - use AuthenticateOAuth for new implementations)
         /// </summary>
         [Obsolete("Use AuthenticateOAuth for OAuth2-based authentication", true)]
-    public async Task Authenticate(AuthorizationCredentials credentials)
+    public async Task Authenticate(AuthorizationCredentials credentials, CancellationToken cancellationToken = default)
     {
         _userAgent = credentials.UserAgent;
         _baseUrl = credentials.ApiBaseUrl;
@@ -79,15 +80,15 @@ public class TastyTradeClient
         client.DefaultRequestHeaders.UserAgent.ParseAdd(credentials.UserAgent);
         using var content = new StringContent(JsonSerializer.Serialize(credentials));
         content.Headers.ContentType = new MediaTypeHeaderValue(Constants.ContentType);
-        var response = await client.PostAsync($"{_baseUrl}/sessions", content);
-        var responseJson = await response.Content.ReadAsStringAsync();
+        var response = await client.PostAsync($"{_baseUrl}/sessions", content, cancellationToken);
+        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
         _authenticationResponse = JsonSerializer.Deserialize<AuthenticationResponse>(responseJson);
     }
 
     /// <summary>
     /// Obtains an OAuth2 access token using the refresh token grant type.
     /// </summary>
-    private async Task<string> GetAccessTokenAsync()
+    private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken = default)
     {
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent ?? "TastyTradeClient/1.0");
@@ -102,8 +103,8 @@ public class TastyTradeClient
         };
 
         using var content = new FormUrlEncodedContent(formData);
-        var response = await client.PostAsync($"{_baseUrl}/oauth/token", content);
-        var responseJson = await response.Content.ReadAsStringAsync();
+        var response = await client.PostAsync($"{_baseUrl}/oauth/token", content, cancellationToken);
+        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -124,17 +125,18 @@ public class TastyTradeClient
     /// <summary>
     /// Refreshes the OAuth2 access token if needed. Can be called manually or automatically when a 401 is detected.
     /// </summary>
-    public async Task RefreshAccessTokenAsync()
+    /// <param name="cancellationToken">A token to cancel the asynchronous operation.</param>
+    public async Task RefreshAccessTokenAsync(CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_clientId) || string.IsNullOrWhiteSpace(_clientSecret) || string.IsNullOrWhiteSpace(_refreshToken))
         {
             throw new InvalidOperationException("OAuth credentials not configured. Use AuthenticateOAuth first.");
         }
 
-        await _refreshLock.WaitAsync();
+        await _refreshLock.WaitAsync(cancellationToken);
         try
         {
-            _accessToken = await GetAccessTokenAsync();
+            _accessToken = await GetAccessTokenAsync(cancellationToken);
             _tokenLastRefreshed = DateTime.UtcNow;
         }
         finally
@@ -158,125 +160,125 @@ public class TastyTradeClient
     /// <summary>
     /// Proactively refreshes the token if it's approaching expiration.
     /// </summary>
-    private async Task EnsureTokenFreshAsync()
+    private async Task EnsureTokenFreshAsync(CancellationToken cancellationToken = default)
     {
         if (ShouldRefreshToken())
         {
-            await RefreshAccessTokenAsync();
+            await RefreshAccessTokenAsync(cancellationToken);
         }
     }
 
     /// <summary>
     /// Gets customer.
     /// </summary>
-    public async Task<CustomerResponse> GetCustomer()
+    public async Task<CustomerResponse> GetCustomer(CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/customers/me");
+        var response = await Get($"{_baseUrl}/customers/me", cancellationToken);
         return JsonSerializer.Deserialize<CustomerResponse>(response);
     }
     /// <summary>
     /// Gets api quote tokens.
     /// </summary>
-    public async Task<ApiQuoteTokenResponse> GetApiQuoteTokens()
+    public async Task<ApiQuoteTokenResponse> GetApiQuoteTokens(CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/api-quote-tokens");
+        var response = await Get($"{_baseUrl}/api-quote-tokens", cancellationToken);
         return JsonSerializer.Deserialize<ApiQuoteTokenResponse>(response);
     }
     /// <summary>
     /// Gets accounts.
     /// </summary>
-    public async Task<AccountsResponse> GetAccounts()
+    public async Task<AccountsResponse> GetAccounts(CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/customers/me/accounts");
+        var response = await Get($"{_baseUrl}/customers/me/accounts", cancellationToken);
         return JsonSerializer.Deserialize<AccountsResponse>(response);
     }
     /// <summary>
     /// Gets account.
     /// </summary>
-    public async Task<AccountResponse> GetAccount(string accountNumber)
+    public async Task<AccountResponse> GetAccount(string accountNumber, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/customers/me/accounts/{accountNumber}");
+        var response = await Get($"{_baseUrl}/customers/me/accounts/{accountNumber}", cancellationToken);
         return JsonSerializer.Deserialize<AccountResponse>(response);
     }
     /// <summary>
     /// Gets account status.
     /// </summary>
-    public async Task<TradingStatusResponse> GetAccountStatus(string accountNumber)
+    public async Task<TradingStatusResponse> GetAccountStatus(string accountNumber, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/trading-status");
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/trading-status", cancellationToken);
         return JsonSerializer.Deserialize<TradingStatusResponse>(response);
     }
     /// <summary>
     /// Gets account balance.
     /// </summary>
-    public async Task<AccountBalanceResponse> GetAccountBalance(string accountNumber)
+    public async Task<AccountBalanceResponse> GetAccountBalance(string accountNumber, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/balances");
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/balances", cancellationToken);
         return JsonSerializer.Deserialize<AccountBalanceResponse>(response);
     }
     /// <summary>
     /// Gets account balance.
     /// </summary>
-    public async Task<AccountBalanceResponse> GetAccountBalance(string accountNumber, string currency)
+    public async Task<AccountBalanceResponse> GetAccountBalance(string accountNumber, string currency, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/balances/{currency}");
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/balances/{currency}", cancellationToken);
         return JsonSerializer.Deserialize<AccountBalanceResponse>(response);
     }
     /// <summary>
     /// Gets account balance snapshot.
     /// </summary>
-    public async Task<AccountBalanceResponse> GetAccountBalanceSnapshot(string accountNumber)
+    public async Task<AccountBalanceResponse> GetAccountBalanceSnapshot(string accountNumber, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/balance-snapshots");
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/balance-snapshots", cancellationToken);
         return JsonSerializer.Deserialize<AccountBalanceResponse>(response);
     }
     /// <summary>
     /// Gets all futures.
     /// </summary>
-    public async Task<FutureContractsResponse> GetAllFutures()
+    public async Task<FutureContractsResponse> GetAllFutures(CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/instruments/futures");
+        var response = await Get($"{_baseUrl}/instruments/futures", cancellationToken);
         return JsonSerializer.Deserialize<FutureContractsResponse>(response);
     }
     /// <summary>
     /// Gets all future option products.
     /// </summary>
-    public async Task<FutureOptionProductsResponse> GetAllFutureOptionProducts()
+    public async Task<FutureOptionProductsResponse> GetAllFutureOptionProducts(CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/instruments/future-option-products");
+        var response = await Get($"{_baseUrl}/instruments/future-option-products", cancellationToken);
         return JsonSerializer.Deserialize<FutureOptionProductsResponse>(response);
     }
     /// <summary>
     /// Gets future option product.
     /// </summary>
-    public async Task<FutureOptionProductResponse> GetFutureOptionProduct(string exchange, string symbol)
+    public async Task<FutureOptionProductResponse> GetFutureOptionProduct(string exchange, string symbol, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/instruments/future-option-products/{exchange}/{symbol}");
+        var response = await Get($"{_baseUrl}/instruments/future-option-products/{exchange}/{symbol}", cancellationToken);
         return JsonSerializer.Deserialize<FutureOptionProductResponse>(response);
     }
     /// <summary>
     /// Gets futures contract.
     /// </summary>
-    public async Task<FutureContractResponse> GetFuturesContract(string symbol)
+    public async Task<FutureContractResponse> GetFuturesContract(string symbol, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/instruments/futures/{symbol}");
+        var response = await Get($"{_baseUrl}/instruments/futures/{symbol}", cancellationToken);
         return JsonSerializer.Deserialize<FutureContractResponse>(response);
     }
     /// <summary>
     /// Executes the search operation.
     /// </summary>
-    public async Task<SearchResponse> Search(string symbol)
+    public async Task<SearchResponse> Search(string symbol, CancellationToken cancellationToken = default)
     {
         //this method seemed to be unavalaible at the time I added it.
-        var response = await Get($"{_baseUrl}/symbols/search/{symbol}");
+        var response = await Get($"{_baseUrl}/symbols/search/{symbol}", cancellationToken);
         return JsonSerializer.Deserialize<SearchResponse>(response);
     }
     /// <summary>
     /// Gets option chains.
     /// </summary>
-    public async Task<OptionChainResponse> GetOptionChains(string symbol)
+    public async Task<OptionChainResponse> GetOptionChains(string symbol, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/option-chains/{symbol}");
+        var response = await Get($"{_baseUrl}/option-chains/{symbol}", cancellationToken);
         var chain = JsonSerializer.Deserialize<OptionChainResponse>(response);
         chain.Data.Items = [.. chain.Data.Items.Where(x => x.Active).OrderBy(x => x.StrikePrice)];
         return chain;
@@ -284,9 +286,9 @@ public class TastyTradeClient
     /// <summary>
     /// Gets future option chains.
     /// </summary>
-    public async Task<OptionChainResponse> GetFutureOptionChains(string symbol)
+    public async Task<OptionChainResponse> GetFutureOptionChains(string symbol, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/futures-option-chains/{symbol}");
+        var response = await Get($"{_baseUrl}/futures-option-chains/{symbol}", cancellationToken);
         var chain = JsonSerializer.Deserialize<OptionChainResponse>(response);
         chain.Data.Items = [.. chain.Data.Items.Where(x => x.Active).OrderBy(x => x.StrikePrice)];
         return chain;
@@ -296,18 +298,18 @@ public class TastyTradeClient
     /// <summary>
     /// Gets transactions.
     /// </summary>
-    public async Task<TransactionsResponse> GetTransactions(string accountNumber)
+    public async Task<TransactionsResponse> GetTransactions(string accountNumber, CancellationToken cancellationToken = default)
     {
         var sinceWhen = DateTime.UtcNow.AddMonths(-12);
         var untilWhen = DateTime.UtcNow;
-        return await GetTransactions(accountNumber, sinceWhen, untilWhen);
+        return await GetTransactions(accountNumber, sinceWhen, untilWhen, cancellationToken);
     }
 
     // Implementation: fetches all pages using pagination (top-level "pagination" object) and aggregates items.
     /// <summary>
     /// Gets transactions.
     /// </summary>
-    public async Task<TransactionsResponse> GetTransactions(string accountNumber, DateTime startDate, DateTime endDate)
+    public async Task<TransactionsResponse> GetTransactions(string accountNumber, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(accountNumber)) throw new ArgumentException("accountNumber is required", nameof(accountNumber));
         var aggregatedItems = new List<TransactionsResponseDataItem>();
@@ -318,8 +320,10 @@ public class TastyTradeClient
 
         while (pageOffset < totalPages)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var url = $"{_baseUrl}/accounts/{accountNumber}/transactions?per-page={perPage}&start-date={startDate:yyyy-MM-dd}&end-date={endDate:yyyy-MM-dd}&page-offset={pageOffset}";
-            var responseText = await Get(url);
+            var responseText = await Get(url, cancellationToken);
             if (string.IsNullOrWhiteSpace(responseText))
             {
                 break;
@@ -380,9 +384,9 @@ public class TastyTradeClient
     /// <summary>
     /// Gets equity.
     /// </summary>
-    public async Task<EquityResponse> GetEquity(string symbol)
+    public async Task<EquityResponse> GetEquity(string symbol, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/instruments/equities/{symbol}");
+        var response = await Get($"{_baseUrl}/instruments/equities/{symbol}", cancellationToken);
         return JsonSerializer.Deserialize<EquityResponse>(response);
     }
 
@@ -390,9 +394,9 @@ public class TastyTradeClient
     /// <summary>
     /// Gets positions.
     /// </summary>
-    public async Task<PositionsResponse> GetPositions(string accountNumber)
+    public async Task<PositionsResponse> GetPositions(string accountNumber, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/positions");
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/positions", cancellationToken);
         return JsonSerializer.Deserialize<PositionsResponse>(response);
     }
 
@@ -400,22 +404,22 @@ public class TastyTradeClient
     /// <summary>
     /// Gets all public watch lists.
     /// </summary>
-    public async Task<WatchListsResponse> GetAllPublicWatchLists(bool countsOnly = false)
+    public async Task<WatchListsResponse> GetAllPublicWatchLists(bool countsOnly = false, CancellationToken cancellationToken = default)
     {
         var url = $"{_baseUrl}/public-watchlists";
         if (countsOnly)
             url += "?counts-only=true";
 
-        var response = await Get(url);
+        var response = await Get(url, cancellationToken);
         return JsonSerializer.Deserialize<WatchListsResponse>(response);
     }
 
     /// <summary>
     /// Gets public watch list.
     /// </summary>
-    public async Task<WatchListResponse> GetPublicWatchList(string watchlist_name)
+    public async Task<WatchListResponse> GetPublicWatchList(string watchlist_name, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/public-watchlists/{watchlist_name}");
+        var response = await Get($"{_baseUrl}/public-watchlists/{watchlist_name}", cancellationToken);
         return JsonSerializer.Deserialize<WatchListResponse>(response);
     }
 
@@ -423,18 +427,18 @@ public class TastyTradeClient
     /// <summary>
     /// Gets all user watch lists.
     /// </summary>
-    public async Task<WatchListsResponse> GetAllUserWatchLists()
+    public async Task<WatchListsResponse> GetAllUserWatchLists(CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/watchlists");
+        var response = await Get($"{_baseUrl}/watchlists", cancellationToken);
         return JsonSerializer.Deserialize<WatchListsResponse>(response);
     }
 
     /// <summary>
     /// Gets user watch list.
     /// </summary>
-    public async Task<WatchListResponse> GetUserWatchList(string watchlist_name)
+    public async Task<WatchListResponse> GetUserWatchList(string watchlist_name, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/watchlists/{watchlist_name}");
+        var response = await Get($"{_baseUrl}/watchlists/{watchlist_name}", cancellationToken);
         if (string.IsNullOrWhiteSpace(response))
         {
             return default(WatchListResponse);
@@ -445,25 +449,25 @@ public class TastyTradeClient
     /// <summary>
     /// Executes the create user watch list operation.
     /// </summary>
-    public async Task<WatchListResponse> CreateUserWatchList(CreateWatchListRequest request)
+    public async Task<WatchListResponse> CreateUserWatchList(CreateWatchListRequest request, CancellationToken cancellationToken = default)
     {
-        return await Post<CreateWatchListRequest, WatchListResponse>($"{_baseUrl}/watchlists", request);
+        return await Post<CreateWatchListRequest, WatchListResponse>($"{_baseUrl}/watchlists", request, cancellationToken);
     }
 
     /// <summary>
     /// Executes the update user watch list operation.
     /// </summary>
-    public async Task<WatchListResponse> UpdateUserWatchList(string watchlist_name, UpdateWatchListRequest request)
+    public async Task<WatchListResponse> UpdateUserWatchList(string watchlist_name, UpdateWatchListRequest request, CancellationToken cancellationToken = default)
     {
-        return await Put<UpdateWatchListRequest, WatchListResponse>($"{_baseUrl}/watchlists/{watchlist_name}", request);
+        return await Put<UpdateWatchListRequest, WatchListResponse>($"{_baseUrl}/watchlists/{watchlist_name}", request, cancellationToken);
     }
 
     /// <summary>
     /// Executes the delete user watch list operation.
     /// </summary>
-    public async Task<WatchListResponse> DeleteUserWatchList(string watchlist_name)
+    public async Task<WatchListResponse> DeleteUserWatchList(string watchlist_name, CancellationToken cancellationToken = default)
     {
-        var response = await Delete($"{_baseUrl}/watchlists/{watchlist_name}");
+        var response = await Delete($"{_baseUrl}/watchlists/{watchlist_name}", cancellationToken);
         return JsonSerializer.Deserialize<WatchListResponse>(response);
     }
 
@@ -471,27 +475,27 @@ public class TastyTradeClient
     /// <summary>
     /// Gets all pairs watch lists.
     /// </summary>
-    public async Task<PairsWatchListsResponse> GetAllPairsWatchLists()
+    public async Task<PairsWatchListsResponse> GetAllPairsWatchLists(CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/pairs-watchlists");
+        var response = await Get($"{_baseUrl}/pairs-watchlists", cancellationToken);
         return JsonSerializer.Deserialize<PairsWatchListsResponse>(response);
     }
 
     /// <summary>
     /// Gets pairs watch list.
     /// </summary>
-    public async Task<PairsWatchListResponse> GetPairsWatchList(string pairs_watchlist_name)
+    public async Task<PairsWatchListResponse> GetPairsWatchList(string pairs_watchlist_name, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/pairs-watchlists/{pairs_watchlist_name}");
+        var response = await Get($"{_baseUrl}/pairs-watchlists/{pairs_watchlist_name}", cancellationToken);
         return JsonSerializer.Deserialize<PairsWatchListResponse>(response);
     }
 
     /// <summary>
     /// Gets market metrics.
     /// </summary>
-    public async Task<MarketMetricsInfoResponse> GetMarketMetrics(string[] symbols)
+    public async Task<MarketMetricsInfoResponse> GetMarketMetrics(string[] symbols, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/market-metrics?symbols={string.Join(',', symbols)}");
+        var response = await Get($"{_baseUrl}/market-metrics?symbols={string.Join(',', symbols)}", cancellationToken);
         if (string.IsNullOrWhiteSpace(response))
         {
             return default(MarketMetricsInfoResponse);
@@ -507,9 +511,9 @@ public class TastyTradeClient
     /// <summary>
     /// Gets historic dividends.
     /// </summary>
-    public async Task<DividendInfoResponse> GetHistoricDividends(string symbol)
+    public async Task<DividendInfoResponse> GetHistoricDividends(string symbol, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/market-metrics/historic-corporate-events/dividends/{symbol}");
+        var response = await Get($"{_baseUrl}/market-metrics/historic-corporate-events/dividends/{symbol}", cancellationToken);
         if (string.IsNullOrWhiteSpace(response))
         {
             return default(DividendInfoResponse);
@@ -525,7 +529,7 @@ public class TastyTradeClient
     /// <summary>
     /// Gets historic earnings.
     /// </summary>
-    public async Task<EarningsInfoResponse> GetHistoricEarnings(string symbol, DateTime startDate, DateTime? endDate = null)
+    public async Task<EarningsInfoResponse> GetHistoricEarnings(string symbol, DateTime startDate, DateTime? endDate = null, CancellationToken cancellationToken = default)
     {
         var url = $"{_baseUrl}/market-metrics/historic-corporate-events/earnings-reports/{symbol}?start-date={startDate:yyyy-MM-dd}";
         if (endDate.HasValue)
@@ -533,7 +537,7 @@ public class TastyTradeClient
             url += $"&end-date={endDate.Value:yyyy-MM-dd}";
         }
 
-        var response = await Get(url);
+        var response = await Get(url, cancellationToken);
         if (string.IsNullOrWhiteSpace(response))
         {
             return default(EarningsInfoResponse);
@@ -549,9 +553,9 @@ public class TastyTradeClient
     /// <summary>
     /// Gets margin requirements public configuration.
     /// </summary>
-    public async Task<MarginRequirementsPublicConfigurationResponse> GetMarginRequirementsPublicConfiguration()
+    public async Task<MarginRequirementsPublicConfigurationResponse> GetMarginRequirementsPublicConfiguration(CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/margin-requirements-public-configuration");
+        var response = await Get($"{_baseUrl}/margin-requirements-public-configuration", cancellationToken);
         if (string.IsNullOrWhiteSpace(response))
         {
             return default(MarginRequirementsPublicConfigurationResponse);
@@ -562,7 +566,7 @@ public class TastyTradeClient
     /// <summary>
     /// Gets market data.
     /// </summary>
-    public async Task<MarketDataResponse> GetMarketData(string[] index, string[] equity, string[] equityOption, string[] future, string[] futureOption, string[] cryptocurrency)
+    public async Task<MarketDataResponse> GetMarketData(string[] index, string[] equity, string[] equityOption, string[] future, string[] futureOption, string[] cryptocurrency, CancellationToken cancellationToken = default)
     {
         var indexParam = index?.Length > 0 ? string.Join(',', index) : string.Empty;
         var equityParam = equity?.Length > 0 ? string.Join(',', equity) : string.Empty;
@@ -572,7 +576,7 @@ public class TastyTradeClient
         var futureOptionParam = futureOption?.Length > 0 ? string.Join(',', futureOption) : string.Empty;
         var cryptocurrencyParam = cryptocurrency?.Length > 0 ? string.Join(',', cryptocurrency) : string.Empty;
 
-        var response = await Get($"{_baseUrl}/market-data/by-type?index={indexParam}&equity={equityParam}&equity-option={equityOptionParam}&future={futureParam}&future-option={futureOptionParam}&cryptocurrency={cryptocurrencyParam}");
+        var response = await Get($"{_baseUrl}/market-data/by-type?index={indexParam}&equity={equityParam}&equity-option={equityOptionParam}&future={futureParam}&future-option={futureOptionParam}&cryptocurrency={cryptocurrencyParam}", cancellationToken);
 
         if (string.IsNullOrWhiteSpace(response))
         {
@@ -583,9 +587,9 @@ public class TastyTradeClient
 
 
 
-    private async Task<string> Get(string url)
+    private async Task<string> Get(string url, CancellationToken cancellationToken = default)
     {
-        await EnsureTokenFreshAsync();
+        await EnsureTokenFreshAsync(cancellationToken);
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
@@ -601,12 +605,12 @@ public class TastyTradeClient
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_authenticationResponse.Data.SessionToken);
         }
 
-        var response = await client.GetAsync(url);
+        var response = await client.GetAsync(url, cancellationToken);
 
         // Handle 401 Unauthorized - token expired
         if (response.StatusCode == HttpStatusCode.Unauthorized && !string.IsNullOrWhiteSpace(_accessToken))
         {
-            await RefreshAccessTokenAsync();
+            await RefreshAccessTokenAsync(cancellationToken);
 
             // Retry the request with the new token
             using var retryClient = new HttpClient();
@@ -614,15 +618,15 @@ public class TastyTradeClient
             retryClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
             retryClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
-            response = await retryClient.GetAsync(url);
+            response = await retryClient.GetAsync(url, cancellationToken);
         }
 
-        return await response.Content.ReadAsStringAsync();
+        return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
-    private async Task<string> Post(string url, string jsonBody)
+    private async Task<string> Post(string url, string jsonBody, CancellationToken cancellationToken = default)
     {
-        await EnsureTokenFreshAsync();
+        await EnsureTokenFreshAsync(cancellationToken);
 
         var uri = new Uri(url);
         using var client = new HttpClient();
@@ -642,12 +646,12 @@ public class TastyTradeClient
         using var content = new StringContent( jsonBody );
         content.Headers.ContentType = new MediaTypeHeaderValue(Constants.ContentType);
 
-        var response = await client.PostAsync(uri, content);
+        var response = await client.PostAsync(uri, content, cancellationToken);
 
         // Handle 401 Unauthorized - token expired
         if (response.StatusCode == HttpStatusCode.Unauthorized && !string.IsNullOrWhiteSpace(_accessToken))
         {
-            await RefreshAccessTokenAsync();
+            await RefreshAccessTokenAsync(cancellationToken);
 
             // Retry the request with the new token
             using var retryClient = new HttpClient();
@@ -658,33 +662,33 @@ public class TastyTradeClient
             using var retryContent = new StringContent(jsonBody);
             retryContent.Headers.ContentType = new MediaTypeHeaderValue(Constants.ContentType);
 
-            response = await retryClient.PostAsync(uri, retryContent);
+            response = await retryClient.PostAsync(uri, retryContent, cancellationToken);
         }
 
         if ((!response.IsSuccessStatusCode) && (response.StatusCode != HttpStatusCode.UnprocessableEntity))
         {
-            var errorResponseTextIfAny = await response.Content.ReadAsStringAsync();
+            var errorResponseTextIfAny = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException($"{uri.PathAndQuery} - {response.StatusCode.ToString()}-{response.ReasonPhrase}", new InvalidOperationException(errorResponseTextIfAny));
         }
-        var responseText = await response.Content.ReadAsStringAsync();
+        var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
         return responseText;
     }
 
-    private async Task<ResponseType> Post<RequestType, ResponseType>(string url, RequestType requestBodyObject) 
+    private async Task<ResponseType> Post<RequestType, ResponseType>(string url, RequestType requestBodyObject, CancellationToken cancellationToken = default)
         where RequestType : new()
-        where ResponseType : new() 
+        where ResponseType : new()
     {
         var requestBodyJson = JsonSerializer.Serialize(requestBodyObject);
-        var responseJson = await Post(url, requestBodyJson);
+        var responseJson = await Post(url, requestBodyJson, cancellationToken);
 
         var responseType = JsonSerializer.Deserialize<ResponseType>(responseJson);
 
         return responseType;
     }
 
-    private async Task<string> Put(string url, string jsonBody)
+    private async Task<string> Put(string url, string jsonBody, CancellationToken cancellationToken = default)
     {
-        await EnsureTokenFreshAsync();
+        await EnsureTokenFreshAsync(cancellationToken);
 
         var uri = new Uri(url);
         using var client = new HttpClient();
@@ -703,11 +707,11 @@ public class TastyTradeClient
         using var content = new StringContent(jsonBody);
         content.Headers.ContentType = new MediaTypeHeaderValue(Constants.ContentType);
 
-        var response = await client.PutAsync(uri, content);
+        var response = await client.PutAsync(uri, content, cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.Unauthorized && !string.IsNullOrWhiteSpace(_accessToken))
         {
-            await RefreshAccessTokenAsync();
+            await RefreshAccessTokenAsync(cancellationToken);
 
             using var retryClient = new HttpClient();
             retryClient.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
@@ -717,33 +721,33 @@ public class TastyTradeClient
             using var retryContent = new StringContent(jsonBody);
             retryContent.Headers.ContentType = new MediaTypeHeaderValue(Constants.ContentType);
 
-            response = await retryClient.PutAsync(uri, retryContent);
+            response = await retryClient.PutAsync(uri, retryContent, cancellationToken);
         }
 
         if (!response.IsSuccessStatusCode)
         {
-            var errorResponseTextIfAny = await response.Content.ReadAsStringAsync();
+            var errorResponseTextIfAny = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new InvalidOperationException($"{uri.PathAndQuery} - {response.StatusCode.ToString()}-{response.ReasonPhrase}", new InvalidOperationException(errorResponseTextIfAny));
         }
 
-        return await response.Content.ReadAsStringAsync();
+        return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
-    private async Task<ResponseType> Put<RequestType, ResponseType>(string url, RequestType requestBodyObject)
+    private async Task<ResponseType> Put<RequestType, ResponseType>(string url, RequestType requestBodyObject, CancellationToken cancellationToken = default)
         where RequestType : new()
         where ResponseType : new()
     {
         var requestBodyJson = JsonSerializer.Serialize(requestBodyObject);
-        var responseJson = await Put(url, requestBodyJson);
+        var responseJson = await Put(url, requestBodyJson, cancellationToken);
 
         var responseType = JsonSerializer.Deserialize<ResponseType>(responseJson);
 
         return responseType;
     }
 
-    private async Task<string> Delete(string url)
+    private async Task<string> Delete(string url, CancellationToken cancellationToken = default)
     {
-        await EnsureTokenFreshAsync();
+        await EnsureTokenFreshAsync(cancellationToken);
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
@@ -758,29 +762,29 @@ public class TastyTradeClient
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(_authenticationResponse.Data.SessionToken);
         }
 
-        var response = await client.DeleteAsync(url);
+        var response = await client.DeleteAsync(url, cancellationToken);
 
         if (response.StatusCode == HttpStatusCode.Unauthorized && !string.IsNullOrWhiteSpace(_accessToken))
         {
-            await RefreshAccessTokenAsync();
+            await RefreshAccessTokenAsync(cancellationToken);
 
             using var retryClient = new HttpClient();
             retryClient.DefaultRequestHeaders.UserAgent.ParseAdd(_userAgent);
             retryClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue(Constants.Accept));
             retryClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _accessToken);
 
-            response = await retryClient.DeleteAsync(url);
+            response = await retryClient.DeleteAsync(url, cancellationToken);
         }
 
-        return await response.Content.ReadAsStringAsync();
+        return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
 
     /// <summary>
     /// Executes the post order submission operation.
     /// </summary>
-    public async Task<PlacedOrderResponse> PostOrderSubmission(string accountNumber, PlaceOrderRequest orderSubmission) {
-        var orderSubmissionResponse = await Post<PlaceOrderRequest, PlacedOrderResponse> ($"{_baseUrl}/accounts/{accountNumber}/orders", orderSubmission);
+    public async Task<PlacedOrderResponse> PostOrderSubmission(string accountNumber, PlaceOrderRequest orderSubmission, CancellationToken cancellationToken = default) {
+        var orderSubmissionResponse = await Post<PlaceOrderRequest, PlacedOrderResponse> ($"{_baseUrl}/accounts/{accountNumber}/orders", orderSubmission, cancellationToken);
         return orderSubmissionResponse;
     }
 
@@ -795,7 +799,8 @@ public class TastyTradeClient
         DateTime? endDate = null,
         string[] status = null,
         string underlyingSymbol = null,
-        string sort = "Desc")
+        string sort = "Desc",
+        CancellationToken cancellationToken = default)
     {
         var queryParams = new List<string>
         {
@@ -820,7 +825,7 @@ public class TastyTradeClient
             queryParams.Add($"underlying-symbol={underlyingSymbol}");
 
         var query = string.Join("&", queryParams);
-        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/orders?{query}");
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/orders?{query}", cancellationToken);
         return JsonSerializer.Deserialize<OrdersResponse>(response);
     }
 
@@ -830,43 +835,44 @@ public class TastyTradeClient
     public async Task<OrdersResponse> GetLiveOrders(
         string accountNumber,
         int pageOffset = 0,
-        int perPage = 50)
+        int perPage = 50,
+        CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/orders/live?page-offset={pageOffset}&per-page={perPage}");
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/orders/live?page-offset={pageOffset}&per-page={perPage}", cancellationToken);
         return JsonSerializer.Deserialize<OrdersResponse>(response);
     }
 
     /// <summary>
     /// Gets order.
     /// </summary>
-    public async Task<OrderResponse> GetOrder(string accountNumber, long orderId)
+    public async Task<OrderResponse> GetOrder(string accountNumber, long orderId, CancellationToken cancellationToken = default)
     {
-        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}");
+        var response = await Get($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}", cancellationToken);
         return JsonSerializer.Deserialize<OrderResponse>(response);
     }
 
     /// <summary>
     /// Executes the cancel order operation.
     /// </summary>
-    public async Task<OrderResponse> CancelOrder(string accountNumber, long orderId)
+    public async Task<OrderResponse> CancelOrder(string accountNumber, long orderId, CancellationToken cancellationToken = default)
     {
-        var response = await Delete($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}");
+        var response = await Delete($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}", cancellationToken);
         return JsonSerializer.Deserialize<OrderResponse>(response);
     }
 
     /// <summary>
     /// Executes the replace order operation.
     /// </summary>
-    public async Task<OrderResponse> ReplaceOrder(string accountNumber, long orderId, PlaceOrderRequest newOrder)
+    public async Task<OrderResponse> ReplaceOrder(string accountNumber, long orderId, PlaceOrderRequest newOrder, CancellationToken cancellationToken = default)
     {
-        return await Put<PlaceOrderRequest, OrderResponse>($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}", newOrder);
+        return await Put<PlaceOrderRequest, OrderResponse>($"{_baseUrl}/accounts/{accountNumber}/orders/{orderId}", newOrder, cancellationToken);
     }
 
     /// <summary>
     /// Executes the dry run order operation.
     /// </summary>
-    public async Task<PlacedOrderResponse> DryRunOrder(string accountNumber, PlaceOrderRequest orderRequest)
+    public async Task<PlacedOrderResponse> DryRunOrder(string accountNumber, PlaceOrderRequest orderRequest, CancellationToken cancellationToken = default)
     {
-        return await Post<PlaceOrderRequest, PlacedOrderResponse>($"{_baseUrl}/accounts/{accountNumber}/orders/dry-run", orderRequest);
+        return await Post<PlaceOrderRequest, PlacedOrderResponse>($"{_baseUrl}/accounts/{accountNumber}/orders/dry-run", orderRequest, cancellationToken);
     }
 }
